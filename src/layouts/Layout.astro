@@ -1,0 +1,32 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head class="">
+    <meta charset="UTF-8" />
+    <meta name="description" content="Winter Code Fest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body
+    class="font-poppins bg-yeti-light text-yeti-dark flex flex-col min-h-screen"
+  >
+    <slot />
+
+    <footer class="p-5 bg-yeti-dark text-white mt-auto text-center">
+      &copy; Winter Code Fest
+    </footer>
+  </body>
+</html>

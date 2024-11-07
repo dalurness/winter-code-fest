@@ -1,0 +1,58 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Welcome to Winter Code Fest">
+  <section
+    class="px-4 sm:px-12 py-8 bg-yeti-medium flex flex-col items-center gap-8 max-w-screen-md md:mx-auto md:mt-12 md:rounded-2xl"
+  >
+    <h1 class="text-5xl font-bold text-center">Winter Code Fest</h1>
+    <img src="logo.svg" alt="WCF Logo" class="w-40" />
+    <p class="font-light text-xl">
+      The coolest coding festival of the year. Grab your laptop, your warmest
+      blanket, and join us for a fun-filled month of creativity, coding
+      sessions, and chill vibes! ☕
+    </p>
+    <a
+      href="/day01"
+      class="bg-yeti-dark text-white text-center px-8 py-4 text-xl rounded-full hover:opacity-85 focus:outline focus:outline-2 focus:outline-offset-1 focus:outline-yeti-dark"
+      >Get Started Now</a
+    >
+  </section>
+
+  <section
+    class="px-4 sm:px-12 py-5 flex flex-col items-center gap-8 my-12 max-w-screen-md md:mx-auto"
+  >
+    <h2 class="text-3xl font-bold text-center">What's in Store?</h2>
+
+    <ul class="flex flex-wrap justify-around gap-5">
+      <li class="flex-1 min-w-40 sm:max-w-64">
+        <h3 class="bg-yeti-accent p-3 mb-6 text-center rounded-lg text-xl">
+          Daily Problems
+        </h3>
+        <p class="text-center">
+          Enough problems to do one every day for the month of December. Spice
+          it up and try two in one day, or skip a few!
+        </p>
+      </li>
+      <li class="flex-1 min-w-40 sm:max-w-64">
+        <h3 class="bg-yeti-accent p-3 mb-6 text-center rounded-lg text-xl">
+          Experiment & Learn
+        </h3>
+        <p class="text-center">
+          Try to solve these challenges with the backlog of new programming
+          languages you've been wanting to learn.
+        </p>
+      </li>
+      <li class="flex-1 min-w-40 sm:max-w-64">
+        <h3 class="bg-yeti-accent p-3 mb-6 text-center rounded-lg text-xl">
+          Discussions
+        </h3>
+        <p class="text-center">
+          Discuss coding challenges live. Share ideas, ask for feedback, and
+          brainstorm solutions.
+        </p>
+      </li>
+    </ul>
+  </section>
+</Layout>
