@@ -1,5 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
+
+const { BASE_URL } = import.meta.env;
 ---
 
 <Layout title="Welcome to Winter Code Fest">
@@ -7,14 +9,14 @@ import Layout from "../layouts/Layout.astro";
     class="px-4 sm:px-12 py-8 bg-yeti-medium flex flex-col items-center gap-8 max-w-screen-md md:mx-auto md:mt-12 md:rounded-2xl"
   >
     <h1 class="text-5xl font-bold text-center">Winter Code Fest</h1>
-    <img src="logo.svg" alt="WCF Logo" class="w-40" />
+    <img src={BASE_URL + "/logo.svg"} alt="WCF Logo" class="w-40" />
     <p class="font-light text-xl">
-      The <span class="text-[#5d7dba] font-bold">coolest</span> coding festival of the year. Grab your laptop, your warmest
-      blanket, and join us for a fun-filled month of creativity, coding
-      sessions, and chill vibes! ☕
+      The <span class="text-[#5d7dba] font-bold">coolest</span> coding festival of
+      the year. Grab your laptop, your warmest blanket, and join us for a fun-filled
+      month of creativity, coding sessions, and chill vibes! ☕
     </p>
     <a
-      href="/day01"
+      href={BASE_URL + "/day/1"}
       class="bg-yeti-dark text-white text-center px-8 py-4 text-xl rounded-full hover:opacity-85 focus:outline focus:outline-2 focus:outline-offset-1 focus:outline-yeti-dark"
       >Get Started Now</a
     >
@@ -49,8 +51,8 @@ import Layout from "../layouts/Layout.astro";
           Discussions
         </h3>
         <p class="text-center">
-          Share ideas, ask for feedback, and
-          brainstorm solutions live. Once you finish, show off your result with a PR to the repo!
+          Share ideas, ask for feedback, and brainstorm solutions live. Once you
+          finish, show off your result with a PR to the repo!
         </p>
       </li>
     </ul>

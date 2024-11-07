@@ -20,7 +20,7 @@ Site start up:
 2. clone the repo
 3. run `npm i` from the repo directory to install dependencies
 4. run `npm run dev` to start the website locally
-5. navigate to [localhost:4321](http://localhost:4321)
+5. navigate to [localhost:4321/winter-code-fest](http://localhost:4321/winter-code-fest)
 
 ### 🚀 Project Structure
 
