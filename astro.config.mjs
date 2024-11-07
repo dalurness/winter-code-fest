@@ -6,6 +6,6 @@ import tailwind from "@astrojs/tailwind";
 // https://astro.build/config
 export default defineConfig({
   integrations: [react(), tailwind()],
-  site: 'https://github.com/dalurness/winter-code-fest',
+  site: 'https://dalurness.github.io/winter-code-fest/',
   base: '/'
 });
