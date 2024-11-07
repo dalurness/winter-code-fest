@@ -7,5 +7,5 @@ import tailwind from "@astrojs/tailwind";
 export default defineConfig({
   integrations: [react(), tailwind()],
   site: 'https://github.com/dalurness/winter-code-fest',
-  base: '/site'
+  base: '/'
 });
