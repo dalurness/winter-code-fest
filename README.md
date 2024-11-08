@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="public/logo.svg" width="256px" />
+</p>
+<p align="center">
+  <img src="https://github.com/dalurness/winter-code-fest/actions/workflows/deploy.yml/badge.svg" />
+</p>
+
 # Winter Code Fest 
 Welcome to the coolest coding festival of the year!
 
