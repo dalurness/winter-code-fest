@@ -5,6 +5,9 @@ let x: Record<string, astroHTML.JSX.Element> = import.meta.glob('./solutions/*',
 export function DynamicSolution({ resultComponent }: { resultComponent: string }) {
   let path = `./solutions/${resultComponent}.tsx`
   let Component = x[path]
+
+  if (!Component) return null
+
   return (
     <Component client:load />
   )
