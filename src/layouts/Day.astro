@@ -1,0 +1,67 @@
+---
+interface Props {
+  day: number;
+  title: string;
+  solutions: {
+    [file: string]: string;
+  };
+}
+
+import { MdCalendarMonth, MdEventBusy } from "react-icons/md";
+
+import Layout from "./Layout.astro";
+import SolutionChecker from "../components/SolutionChecker";
+import Calendar from "../components/Calendar";
+
+const { BASE_URL } = import.meta.env;
+const { day, title, solutions } = Astro.props;
+---
+
+<Layout title={`Day ${day}: ${title}`}>
+  <header class="bg-yeti-light-3 w-full">
+    <div
+      class="flex items-center gap-4 max-w-screen-lg w-full mx-auto px-4 md:px-6 py-3"
+    >
+      <a
+        class="flex justify-center items-center gap-2 font-bold text-2xl"
+        href={BASE_URL}
+        ><img src={BASE_URL + "/logo.svg"} alt="Logo" class="w-10" />WCF</a
+      >
+
+      <details class="ml-auto group">
+        <summary class="list-none hover:text-yeti-dark-7 cursor-pointer">
+          <MdCalendarMonth size={32} className="group-open:hidden" />
+          <MdEventBusy size={32} className="hidden group-open:block" />
+        </summary>
+
+        <nav
+          class="fixed right-0 z-10 bg-yeti-light-3 shadow-lg p-4 rounded-l-md h-full w-screen md:max-w-screen-sm"
+        >
+          <Calendar current={day} />
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <div class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12">
+    <h1 class="text-5xl font-bold mb-6 border-b border-yeti-dark">
+      Day {day}: {title}
+    </h1>
+    <div
+      class="*:mb-4 [&_pre]:p-4 [&_pre]:rounded-lg [&_a]:text-yeti-light-9 [&_a:hover]:underline"
+    >
+      <slot />
+    </div>
+  </div>
+
+  <div class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12">
+    {
+      Object.entries(solutions).map(([file, solution]) => (
+        <>
+          <b>{file}:</b>
+          <SolutionChecker solution={solution} client:load />
+        </>
+      ))
+    }
+  </div>
+</Layout>

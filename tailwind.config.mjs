@@ -6,10 +6,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        "yeti-light": "#E5F0FF",
-        "yeti-medium": "#D0E3FF",
-        "yeti-dark": "#333",
-        "yeti-accent": "#B9D1FF",
+        yeti: {
+          light: {
+            1: "#E5F0FF",
+            3: "#D0E3FF",
+            DEFAULT: "#B9D1FF",
+            5: "#B9D1FF",
+            7: "#99BDFF",
+            9: "#5D7DBA",
+          },
+
+          dark: {
+            1: "#5C5C5C",
+            3: "#474747",
+            DEFAULT: "#333333",
+            5: "#333333",
+            7: "#1F1F1F",
+            9: "#0A0A0A",
+          },
+        },
       },
       fontFamily: {
         poppins: ["Poppins", ...defaultTheme.fontFamily.sans],

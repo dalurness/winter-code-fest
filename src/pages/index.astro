@@ -1,4 +1,5 @@
 ---
+import { LinkButton } from "../components/Button";
 import Layout from "../layouts/Layout.astro";
 
 const { BASE_URL } = import.meta.env;
@@ -6,19 +7,17 @@ const { BASE_URL } = import.meta.env;
 
 <Layout title="Welcome to Winter Code Fest">
   <section
-    class="px-4 sm:px-12 py-8 bg-yeti-medium flex flex-col items-center gap-8 max-w-screen-md md:mx-auto md:mt-12 md:rounded-2xl"
+    class="px-4 sm:px-12 py-8 bg-yeti-light-3 flex flex-col items-center gap-8 max-w-screen-md md:mx-auto md:mt-12 md:rounded-2xl"
   >
     <h1 class="text-5xl font-bold text-center">Winter Code Fest</h1>
     <img src={BASE_URL + "/logo.svg"} alt="WCF Logo" class="w-40" />
     <p class="font-light text-xl">
-      The <span class="text-[#5d7dba] font-bold">coolest</span> coding festival of
-      the year. Grab your laptop, your warmest blanket, and join us for a fun-filled
+      The <span class="text-yeti-light-9 font-bold">coolest</span> coding festival
+      of the year. Grab your laptop, your warmest blanket, and join us for a fun-filled
       month of creativity, coding sessions, and chill vibes! ☕
     </p>
-    <a
-      href={BASE_URL + "/day/1"}
-      class="bg-yeti-dark text-white text-center px-8 py-4 text-xl rounded-full hover:opacity-85 focus:outline focus:outline-2 focus:outline-offset-1 focus:outline-yeti-dark"
-      >Get Started Now</a
+    <LinkButton href="/day/1" color="dark" size="lg" pill
+      >Get Started Now</LinkButton
     >
   </section>
 
@@ -29,7 +28,7 @@ const { BASE_URL } = import.meta.env;
 
     <ul class="flex flex-wrap justify-around gap-5">
       <li class="flex-1 min-w-40 sm:max-w-64">
-        <h3 class="bg-yeti-accent p-3 mb-6 text-center rounded-lg text-xl">
+        <h3 class="bg-yeti-light-5 p-3 mb-6 text-center rounded-lg text-xl">
           Daily Problems
         </h3>
         <p class="text-center">
@@ -38,7 +37,7 @@ const { BASE_URL } = import.meta.env;
         </p>
       </li>
       <li class="flex-1 min-w-40 sm:max-w-64">
-        <h3 class="bg-yeti-accent p-3 mb-6 text-center rounded-lg text-xl">
+        <h3 class="bg-yeti-light-5 p-3 mb-6 text-center rounded-lg text-xl">
           Experiment & Learn
         </h3>
         <p class="text-center">
@@ -47,7 +46,7 @@ const { BASE_URL } = import.meta.env;
         </p>
       </li>
       <li class="flex-1 min-w-40 sm:max-w-64">
-        <h3 class="bg-yeti-accent p-3 mb-6 text-center rounded-lg text-xl">
+        <h3 class="bg-yeti-light-5 p-3 mb-6 text-center rounded-lg text-xl">
           Discussions
         </h3>
         <p class="text-center">
