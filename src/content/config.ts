@@ -4,7 +4,6 @@ const daysCollection = defineCollection({
   type: "content",
   schema: z.object({
     title: z.string(),
-    solutions: z.record(z.string(), z.string()),
   }),
 });
 
