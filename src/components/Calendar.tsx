@@ -1,7 +1,7 @@
 import { getCollection } from "astro:content";
 import { twMerge } from "tailwind-merge";
+import { Link } from "./Link";
 
-const { BASE_URL } = import.meta.env;
 const days = await getCollection("days");
 
 const titles = days.reduce(
@@ -26,9 +26,7 @@ interface Props {
   className?: string;
 }
 
-export default GridCalendar;
-
-function GridCalendar({ current, className }: Props) {
+export function Calendar({ current, className }: Props) {
   return (
     <div
       className={twMerge(
@@ -49,8 +47,8 @@ function GridCalendar({ current, className }: Props) {
 function GridDay({ day, current }: { day: number; current: number }) {
   return (
     <div className="border-yeti-dark border-b border-r">
-      <a
-        href={BASE_URL + "/day/" + day}
+      <Link
+        href={`/day/${day}`}
         className={twMerge(
           "flex flex-col w-full h-full p-2 relative focus:z-10",
           current < day && "bg-yeti-light-1 hover:bg-yeti-light-3",
@@ -63,7 +61,7 @@ function GridDay({ day, current }: { day: number; current: number }) {
         {current > day && (
           <span className="absolute w-full h-px bg-yeti-dark-9 top-1/2 left-0 right-0 -rotate-45"></span>
         )}
-      </a>
+      </Link>
     </div>
   );
 }
@@ -97,7 +95,7 @@ function TableDay({ day, current }: { day: number; current: number }) {
   return (
     <td colSpan={1} className="w-[12.4%] border border-yeti-dark p-0">
       <a
-        href={BASE_URL + "/day/" + day}
+        href={BASE_URL + "day/" + day}
         className={twMerge(
           "flex flex-col w-full h-full p-2 relative", // border-yeti-dark border-b border-r",
           // day <= 7 && "border-t",
