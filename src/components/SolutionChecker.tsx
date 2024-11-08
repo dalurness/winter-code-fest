@@ -5,7 +5,7 @@ interface Props {
   solution: string;
 }
 
-export default function ({ solution }: Props) {
+export function SolutionChecker({ solution }: Props) {
   const [input, setInput] = useState("");
 
   function checkSolution() {

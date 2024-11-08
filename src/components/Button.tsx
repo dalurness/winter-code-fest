@@ -1,6 +1,5 @@
 import { twMerge } from "tailwind-merge";
-
-const { BASE_URL } = import.meta.env;
+import { Link } from "./Link";
 
 export enum Color {
   dark = "dark",
@@ -56,15 +55,13 @@ export function LinkButton({
   color = Color.dark,
   size = Size.medium,
   pill,
-  href,
   className,
   children,
   ...nativeProps
 }: LinkButtonProps) {
   return (
-    <a
+    <Link
       {...nativeProps}
-      href={href.startsWith("/") ? BASE_URL + href : href}
       className={twMerge(
         "text-center",
         pill ? "rounded-full" : "rounded-lg",
@@ -77,6 +74,6 @@ export function LinkButton({
       )}
     >
       {children}
-    </a>
+    </Link>
   );
 }
