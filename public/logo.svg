@@ -4,27 +4,27 @@
 
     <!-- Yeti's fur -->
     <path d="M40 100
-           c20 -40, 100 -40, 120 0
-           c-10, 20, -30, 50, -60, 50
-           c-30, 0, -50, -30, -60, -50z" fill="#D0E3FF" />
+        c20 -40, 100 -40, 120 0
+        c-10, 20, -30, 50, -60, 50
+        c-30, 0, -50, -30, -60, -50z" fill="#D0E3FF" />
 
     <!-- Yeti's eyes -->
     <circle cx="75" cy="85" r="10" fill="#333" />
     <circle cx="125" cy="85" r="10" fill="#333" />
 
     <!-- Yeti's teeth -->
-    <polygon points="85,127 90,135 95,129" fill="#FFF" />
-    <polygon points="105,129 110,135 115,127" fill="#FFF" />
+    <polygon points="99,126 104,118 109,126" fill="#FFF" />
+    <polygon points="107,126 112,115 117,124" fill="#FFF" />
 
     <!-- Yeti's mouth -->
     <path d="M75 120
-           c10, 10, 40, 10, 50, 0" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round" />
+        c10, 10, 40, 10, 50, 0" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round" />
 
     <!-- Yeti's horns -->
     <path d="M60 50
-           c-10, -20, -20, 0, -15, 30
-           c15, -15, 25, 5, 15, -30z" fill="#B9D1FF" />
+        c-10, -20, -20, 0, -15, 30
+        c15, -15, 25, 5, 15, -30z" fill="#B9D1FF" />
     <path d="M140 50
-           c10, -20, 20, 0, 15, 30
-           c-15, -15, -25, 5, -15, -30z" fill="#B9D1FF" />
+        c10, -20, 20, 0, 15, 30
+        c-15, -15, -25, 5, -15, -30z" fill="#B9D1FF" />
 </svg>

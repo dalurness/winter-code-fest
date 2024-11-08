@@ -28,6 +28,7 @@ Site start up:
 3. run `npm i` from the repo directory to install dependencies
 4. run `npm run dev` to start the website locally
 5. navigate to [localhost:4321/winter-code-fest](http://localhost:4321/winter-code-fest)
+6. If some types aren't available such as from calls to `getCollection` you might have to run `npm run astro sync` manually to get those
 
 ### 🚀 Project Structure
 
@@ -64,4 +65,5 @@ All commands are run from the root of the project, from a terminal:
 | `npm run build`           | Build your production site to `./dist/`          |
 | `npm run preview`         | Preview your build locally, before deploying     |
 | `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
+| `npm run astro sync`      | Generate high fidelity types for collections     |
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
