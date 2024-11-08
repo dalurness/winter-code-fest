@@ -32,10 +32,14 @@ const { day, title, solutions } = Astro.props;
         <summary class="list-none hover:text-yeti-dark-7 cursor-pointer">
           <MdCalendarMonth size={32} className="group-open:hidden" />
           <MdEventBusy size={32} className="hidden group-open:block" />
+
+          <!-- fullscreen background element that you can click to close when it's open -->
+          <div class="fixed inset-0 bg-yeti-dark-3/50 hidden group-open:block">
+          </div>
         </summary>
 
         <nav
-          class="fixed right-0 z-10 bg-yeti-light-3 shadow-lg p-4 rounded-l-md h-full w-screen md:max-w-screen-sm"
+          class="fixed right-0 left-0 md:left-auto z-10 flex flex-col bg-yeti-light-3 shadow-lg p-4 rounded-md md:rounded-r-none h-full w-screen md:max-w-screen-sm"
         >
           <Calendar current={day} />
         </nav>

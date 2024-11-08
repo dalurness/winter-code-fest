@@ -30,9 +30,14 @@ export default GridCalendar;
 
 function GridCalendar({ current, className }: Props) {
   return (
-    <div className={twMerge("grid grid-cols-7 w-full", className)}>
+    <div
+      className={twMerge(
+        "grid grid-cols-3 md:grid-cols-7 w-full border-yeti-dark border-t border-l",
+        className
+      )}
+    >
       {Array.from({ length: decemberStartDayOfWeek }, () => (
-        <div></div> // Spacer for days before Dec 1
+        <div className="hidden md:block"></div> // Spacer for days before Dec 1
       ))}
       {Array.from({ length: 31 }, (_, i) => (
         <GridDay day={1 + i} current={current} key={i} />
@@ -43,14 +48,7 @@ function GridCalendar({ current, className }: Props) {
 
 function GridDay({ day, current }: { day: number; current: number }) {
   return (
-    <div
-      className={twMerge(
-        "border-yeti-dark border-b border-r",
-        day <= 7 && "border-t",
-        ((day - (7 - decemberStartDayOfWeek)) % 7 === 1 || day === 1) &&
-          "border-l"
-      )}
-    >
+    <div className="border-yeti-dark border-b border-r">
       <a
         href={BASE_URL + "/day/" + day}
         className={twMerge(
