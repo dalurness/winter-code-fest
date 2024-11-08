@@ -9,6 +9,6 @@ export function DynamicSolution({ resultComponent }: { resultComponent: string }
   if (!Component) return null
 
   return (
-    <Component client:load />
+    <Component />
   )
 };
