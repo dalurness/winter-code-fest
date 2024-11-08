@@ -1,0 +1,22 @@
+---
+import { getCollection } from "astro:content";
+import DayLayout from "../../layouts/Day.astro";
+
+export async function getStaticPaths() {
+  const blogEntries = await getCollection("days");
+  return blogEntries.map((entry) => ({
+    params: { day: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+
+const day = Number(entry.slug);
+const { title, solutions } = entry.data;
+---
+
+<DayLayout day={day} title={title} solutions={solutions}>
+  <Content />
+</DayLayout>
