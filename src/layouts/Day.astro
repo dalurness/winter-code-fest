@@ -3,65 +3,30 @@ interface Props {
   day: number;
   title: string;
   resultComponent: string;
+  solutionUsernames: string[];
 }
 
-import { MdCalendarMonth, MdEventBusy } from "react-icons/md";
-import Layout from "./Layout.astro";
 import { DynamicSolution } from "../components/DynamicSolution";
-import { Calendar } from "../components/Calendar";
 import { Link } from "../components/Link";
-
-const { BASE_URL } = import.meta.env;
-const { day, title, resultComponent } = Astro.props;
+import Question from "./Question.astro";
+const { day, title, resultComponent, solutionUsernames } = Astro.props;
 ---
 
-<Layout title={`Day ${day}: ${title}`}>
-  <header class="bg-yeti-light-3 w-full">
-    <div
-      class="flex items-center gap-4 max-w-screen-lg w-full mx-auto px-4 md:px-6 py-3"
-    >
-      <Link
-        href="/"
-        className="flex justify-center items-center gap-2 font-bold text-2xl"
-        ><img src={BASE_URL + "logo.svg"} alt="Logo" class="w-10" />WCF</Link
-      >
-
-      <details class="ml-auto group">
-        <summary class="list-none hover:text-yeti-dark-7 cursor-pointer">
-          <MdCalendarMonth size={32} className="group-open:hidden" />
-          <MdEventBusy size={32} className="hidden group-open:block" />
-
-          <!-- fullscreen background element that you can click to close when it's open -->
-          <div class="fixed inset-0 bg-yeti-dark-3/50 hidden group-open:block">
-          </div>
-        </summary>
-
-        <nav
-          class="fixed right-0 left-0 md:left-auto z-10 flex flex-col bg-yeti-light-3 shadow-lg p-4 rounded-md md:rounded-r-none h-full w-screen md:max-w-screen-sm"
-        >
-          <Calendar current={day} />
-        </nav>
-      </details>
-    </div>
-  </header>
-
-  <div class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12">
-    <h1 class="text-5xl font-bold mb-6 border-b border-yeti-dark">
-      Day {day}: {title}
-    </h1>
-    <!-- these styles add more beautiful styling to the question markdown -->
-    <div
-      class="*:mb-4 [&_pre]:p-4 [&_pre]:rounded-lg [&_a]:text-yeti-light-9 [&_a:hover]:underline"
-    >
-      <slot />
-    </div>
-  </div>
-
-  <div class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12">
-    {
-      resultComponent && (
-        <DynamicSolution resultComponent={resultComponent} client:load />
-      )
-    }
-  </div>
-</Layout>
+<Question day={day} title={title}>
+  <slot />
+</Question>
+{
+  resultComponent && (
+    <DynamicSolution resultComponent={resultComponent} client:load />
+  )
+}
+<h2 class="text-3xl mt-20 border-b border-yeti-dark">Solutions</h2>
+<div class="mt-5 ml-4">
+  {
+    solutionUsernames.map((username) => (
+      <li class="text-yeti-light-9 hover:text-yeti-light-7">
+        <Link href={`/day/${day}/solution/${username}/`}>{username}</Link>
+      </li>
+    ))
+  }
+</div>

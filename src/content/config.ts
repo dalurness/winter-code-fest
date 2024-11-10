@@ -7,6 +7,11 @@ const daysCollection = defineCollection({
   }),
 });
 
+const communitySolutionsCollection = defineCollection({
+  type: "content"
+})
+
 export const collections = {
   days: daysCollection,
+  communitySolutions: communitySolutionsCollection,
 };
