@@ -1,0 +1,40 @@
+---
+import { getCollection } from "astro:content";
+import LayoutNavbarLayout from "../../../layouts/LayoutNavbar.astro";
+import DayLayout from "../../../layouts/Day.astro";
+
+export async function getStaticPaths() {
+  const blogEntries = await getCollection("days");
+  return blogEntries.map((entry) => ({
+    params: { day: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+
+const solutions = await getCollection("communitySolutions", ({ id }) => {
+  return id.startsWith(`${entry.slug}/`);
+});
+const solutionList = solutions.map((s) => {
+  return {
+    username: s.slug.split("/")[1]!,
+    descriptions: s.data.descriptions,
+  };
+});
+const { Content } = await entry.render();
+
+const day = Number(entry.slug);
+const { title } = entry.data;
+---
+
+<LayoutNavbarLayout day={day} title={title}>
+  <DayLayout
+    day={day}
+    title={title}
+    resultComponent={entry.slug}
+    solutionList={solutionList}
+  >
+    <Content />
+  </DayLayout>
+</LayoutNavbarLayout>

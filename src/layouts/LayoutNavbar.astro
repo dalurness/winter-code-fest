@@ -1,0 +1,18 @@
+---
+interface Props {
+  title: string;
+  day: number;
+}
+
+import Layout from "./Layout.astro";
+import { Navbar } from "../components/Navbar";
+
+const { title, day } = Astro.props;
+---
+
+<Layout title={`Day ${day}: ${title}`}>
+  <Navbar day={day} />
+  <div class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12">
+    <slot />
+  </div>
+</Layout>

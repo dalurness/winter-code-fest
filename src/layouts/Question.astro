@@ -1,0 +1,18 @@
+---
+interface Props {
+  day: number;
+  title: string;
+}
+
+const { day, title } = Astro.props;
+---
+
+<h1 class="text-5xl font-bold mb-6 border-b border-yeti-dark">
+  Day {day}: {title}
+</h1>
+<!-- these styles add more beautiful styling to the question markdown -->
+<div
+  class="*:mb-4 [&_pre]:p-4 [&_pre]:rounded-lg [&_a]:text-yeti-light-9 [&_a:hover]:underline"
+>
+  <slot />
+</div>

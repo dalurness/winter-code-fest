@@ -1,0 +1,48 @@
+---
+import { getCollection } from "astro:content";
+import LayoutNavbarLayout from "../../../../layouts/LayoutNavbar.astro";
+import QuestionLayout from "../../../../layouts/Question.astro";
+
+export async function getStaticPaths() {
+  const blogEntries = await getCollection("days");
+  let entries = blogEntries.flatMap(async (dayEntry) => {
+    const solutions = await getCollection("communitySolutions", ({ id }) => {
+      return id.startsWith(`${dayEntry.slug}/`);
+    });
+    return solutions.map((entry) => {
+      let username = entry.slug.split("/")[1]!;
+
+      return {
+        params: { day: dayEntry.slug, username: username },
+        props: { entry, dayEntry, username },
+      };
+    });
+  });
+  let pages = await Promise.all(entries);
+  return pages.flatMap((p) => p);
+}
+
+const { entry, dayEntry, username } = Astro.props;
+const day = Number(dayEntry.slug);
+const { title } = dayEntry.data;
+const { Content: QuestionContent } = await dayEntry.render();
+const { Content } = await entry.render();
+---
+
+<LayoutNavbarLayout day={day} title={title}>
+  <div class="mb-10">
+    <h1 class="text-5xl font-bold mb-6 border-b border-yeti-dark">
+      <a
+        class="text-yeti-light-9 hover:text-yeti-light-7"
+        href={`https://github.com/${username}`}
+        target="_blank">{username}</a
+      >'s Solution
+    </h1>
+    <div class="mt-10">
+      <Content />
+    </div>
+  </div>
+  <QuestionLayout day={day} title={title}>
+    <QuestionContent />
+  </QuestionLayout>
+</LayoutNavbarLayout>
