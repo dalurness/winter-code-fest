@@ -1,3 +1,6 @@
+---
+descriptions: ["python"]
+---
 ```python
 lowercase = "abcdefghijklmnopqrstuvwxyz"
 full_alpha = [l for l in lowercase] + [l.upper() for l in lowercase]

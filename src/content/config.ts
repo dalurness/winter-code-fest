@@ -8,7 +8,10 @@ const daysCollection = defineCollection({
 });
 
 const communitySolutionsCollection = defineCollection({
-  type: "content"
+  type: "content",
+  schema: z.object({
+    descriptions: z.array(z.string()),
+  }),
 })
 
 export const collections = {

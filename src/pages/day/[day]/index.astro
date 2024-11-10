@@ -16,7 +16,12 @@ const { entry } = Astro.props;
 const solutions = await getCollection("communitySolutions", ({ id }) => {
   return id.startsWith(`${entry.slug}/`);
 });
-const solutionUsernames = solutions.map((s) => s.slug.split("/")[1]!);
+const solutionList = solutions.map((s) => {
+  return {
+    username: s.slug.split("/")[1]!,
+    descriptions: s.data.descriptions,
+  };
+});
 const { Content } = await entry.render();
 
 const day = Number(entry.slug);
@@ -28,7 +33,7 @@ const { title } = entry.data;
     day={day}
     title={title}
     resultComponent={entry.slug}
-    solutionUsernames={solutionUsernames}
+    solutionList={solutionList}
   >
     <Content />
   </DayLayout>

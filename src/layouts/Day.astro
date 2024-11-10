@@ -3,13 +3,16 @@ interface Props {
   day: number;
   title: string;
   resultComponent: string;
-  solutionUsernames: string[];
+  solutionList: {
+    username: string;
+    descriptions: string[];
+  }[];
 }
 
 import { DynamicSolution } from "../components/DynamicSolution";
 import { Link } from "../components/Link";
 import Question from "./Question.astro";
-const { day, title, resultComponent, solutionUsernames } = Astro.props;
+const { day, title, resultComponent, solutionList } = Astro.props;
 ---
 
 <Question day={day} title={title}>
@@ -23,9 +26,19 @@ const { day, title, resultComponent, solutionUsernames } = Astro.props;
 <h2 class="text-3xl mt-20 border-b border-yeti-dark">Solutions</h2>
 <div class="mt-5 ml-4">
   {
-    solutionUsernames.map((username) => (
-      <li class="text-yeti-light-9 hover:text-yeti-light-7">
-        <Link href={`/day/${day}/solution/${username}/`}>{username}</Link>
+    solutionList.map((s) => (
+      <li>
+        <Link
+          href={`/day/${day}/solution/${s.username}/`}
+          className="text-yeti-light-9 hover:text-yeti-light-7"
+        >
+          {s.username} -{" "}
+          {s.descriptions.map((s) => (
+            <span class="border-yeti-light-9 border-2 rounded-lg bg-yeti-light-3 px-1 mx-1">
+              {s}
+            </span>
+          ))}
+        </Link>
       </li>
     ))
   }
