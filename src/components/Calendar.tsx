@@ -12,107 +12,124 @@ const titles = days.reduce(
   {} as Record<number, string>
 );
 
-const december = new Date();
-if (december.getMonth() === 0) {
-  // Use last year's December if it's January
-  december.setFullYear(december.getFullYear() - 1);
-}
-// set to 1st of December
-december.setMonth(11, 1);
-const decemberStartDayOfWeek = december.getDay();
+const now = new Date();
 
-interface Props {
+// Get December 1st. Use last year's December if it's January
+const december = new Date(
+  now.getFullYear() - (now.getMonth() === 0 ? 1 : 0),
+  11, // month is 0 indexed
+  1
+);
+
+// Get the day at the beginning of the week for the calendar display
+const beginningOfWeek = new Date(december);
+beginningOfWeek.setDate(1 - december.getDay());
+
+// All dates that will end up on the calendar
+const dates: Date[] = [];
+for (
+  const currentDate = new Date(beginningOfWeek);
+  !(currentDate.getMonth() === 0 && currentDate.getDay() === 0);
+  currentDate.setDate(currentDate.getDate() + 1)
+) {
+  dates.push(new Date(currentDate));
+}
+
+const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export interface CalendarProps {
   current: number;
   className?: string;
 }
 
-export function Calendar({ current, className }: Props) {
+export function Calendar({ current, className }: CalendarProps) {
   return (
-    <div
-      className={twMerge(
-        "grid grid-cols-3 md:grid-cols-7 w-full border-yeti-dark border-t border-l",
-        className
-      )}
-    >
-      {Array.from({ length: decemberStartDayOfWeek }, () => (
-        <div className="hidden md:block"></div> // Spacer for days before Dec 1
-      ))}
-      {Array.from({ length: 31 }, (_, i) => (
-        <GridDay day={1 + i} current={current} key={i} />
-      ))}
+    <div className="flex flex-col items-center">
+      <div className="text-2xl font-bold mb-1">December</div>
+      <div
+        className={twMerge(
+          "grid grid-cols-7 gap-px w-full bg-yeti-dark-3 border-yeti-dark-3 border rounded-lg",
+          className
+        )}
+      >
+        {daysOfWeek.map((dow, i) => (
+          <span
+            key={dow}
+            className={twMerge(
+              "bg-yeti-light-9 text-center text-white py-1",
+              i === 0 && "rounded-tl-lg",
+              i === 6 && "rounded-tr-lg"
+            )}
+          >
+            {dow[0]}
+            <span className="hidden md:inline">{dow.slice(1)}</span>
+          </span>
+        ))}
+
+        {dates.map((date, i) => {
+          const day = date.getDate();
+
+          if (date.getMonth() !== 11) {
+            return (
+              <div
+                key={yyyymmdd(date)}
+                className={twMerge(
+                  "flex flex-col w-full h-full px-3 py-2 bg-white/70",
+                  i === dates.length - 1 && "rounded-br-lg"
+                )}
+              >
+                <time
+                  dateTime={yyyymmdd(date)}
+                  title={date.toLocaleDateString()}
+                >
+                  {day}
+                </time>
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={yyyymmdd(date)}
+              href={`/day/${day}`}
+              className={twMerge(
+                "flex flex-col items-start w-full h-full px-3 py-2 relative focus:z-10 !text-yeti-dark !no-underline",
+                current <= day && "bg-white hover:bg-yeti-light-1",
+                current > day &&
+                  "bg-yeti-dark-1 hover:bg-yeti-dark-3 !text-white",
+                i === dates.length - 7 && "rounded-bl-lg",
+                i === dates.length - 1 && "rounded-br-lg"
+              )}
+            >
+              <time
+                dateTime={yyyymmdd(date)}
+                title={date.toLocaleDateString()}
+                className={twMerge(
+                  current === day &&
+                    "bg-yeti-light aspect-square text-center rounded-full"
+                )}
+              >
+                {day}
+              </time>
+              {day in titles && (
+                <div className="text-sm mt-2 hidden md:block">
+                  {titles[day]}
+                </div>
+              )}
+              {current > day && (
+                <span className="absolute w-full h-px bg-yeti-dark top-1/2 left-0 right-0 -rotate-45"></span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function GridDay({ day, current }: { day: number; current: number }) {
-  return (
-    <div className="border-yeti-dark border-b border-r">
-      <Link
-        href={`/day/${day}`}
-        className={twMerge(
-          "flex flex-col w-full h-full p-2 relative focus:z-10",
-          current < day && "bg-yeti-light-1 hover:bg-yeti-light-3",
-          current > day && "bg-yeti-dark-1 hover:bg-yeti-dark-3 text-white",
-          current === day && "bg-yeti-light-7 hover:bg-yeti-light-9"
-        )}
-      >
-        <span>{day}</span>
-        <div className="text-sm">{titles[day]}</div>
-        {current > day && (
-          <span className="absolute w-full h-px bg-yeti-dark-9 top-1/2 left-0 right-0 -rotate-45"></span>
-        )}
-      </Link>
-    </div>
-  );
+/**
+ * Format a date in YYYY-MM-DD format
+ */
+function yyyymmdd(date: Date): string {
+  return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
 }
-
-/*
-function TableCalendar({ current, className }: Props) {
-  return (
-    <table className={twMerge("w-full table-fixed", className)}>
-      <tr>
-        {Array.from({ length: decemberStartDayOfWeek }, (_, i) => (
-          <td colSpan={1} key={i} className="w-[12.4%]"></td> // Spacer for days before Dec 1
-        ))}
-        {Array.from({ length: 7 - decemberStartDayOfWeek }, (_, i) => (
-          <TableDay day={1 + i} current={current} key={i} />
-        ))}
-      </tr>
-      <tr>
-        {Array.from({ length: 7 }, (_, i) => (
-          <TableDay
-            day={7 - decemberStartDayOfWeek + 1 + i}
-            current={current}
-            key={i}
-          />
-        ))}
-      </tr>
-    </table>
-  );
-}
-
-function TableDay({ day, current }: { day: number; current: number }) {
-  return (
-    <td colSpan={1} className="w-[12.4%] border border-yeti-dark p-0">
-      <a
-        href={BASE_URL + "day/" + day}
-        className={twMerge(
-          "flex flex-col w-full h-full p-2 relative", // border-yeti-dark border-b border-r",
-          // day <= 7 && "border-t",
-          // ((day - (7 - decemberStartDayOfWeek)) % 7 === 1 || day === 1) &&
-          //   "border-l",
-          current < day && "bg-yeti-light-1 hover:bg-yeti-light-3",
-          current > day && "bg-yeti-dark-1 hover:bg-yeti-dark-3 text-white",
-          current === day && "bg-yeti-light-7 hover:bg-yeti-light-9"
-        )}
-      >
-        <span>{day}</span>
-        <div className="text-sm">{titles[day]}</div>
-        {current > day && (
-          <span className="absolute w-full h-px bg-yeti-dark-9 top-1/2 left-0 right-0 -rotate-45"></span>
-        )}
-      </a>
-    </td>
-  );
-}
-*/
