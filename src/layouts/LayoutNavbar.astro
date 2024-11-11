@@ -12,7 +12,19 @@ const { title, day } = Astro.props;
 
 <Layout title={`Day ${day}: ${title}`}>
   <Navbar day={day} />
-  <div class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12">
+  <!-- Setup some base styles as a theme -->
+  <div
+    class="flex flex-col max-w-screen-lg w-full mx-auto px-4 md:px-6 my-12
+      [&_h1]:text-5xl [&_h1]:font-bold [&_h1]:mb-6 [&_h1]:border-b [&_h1]:border-yeti-dark
+      [&_h2]:text-3xl [&_h2]:mb-6 [&_h2]:border-b [&_h2]:border-yeti-dark
+      [&_h3]:text-xl [&_h3]:mb-6
+      [&_a]:text-yeti-light-9 [&_a:hover]:underline
+      [&_pre:has(code)]:p-4 [&_pre]:rounded-lg [&_pre]:!bg-yeti-dark-7 [&_pre]:!text-white
+      [&_:not(pre)>code]:bg-yeti-dark-7 [&_:not(pre)>code]:text-white [&_:not(pre)>code]:rounded [&_:not(pre)>code]:px-1
+      [&_ul]:list-disc [&_ul]:list-inside
+      [&_ol]:list-decimal [&_ol]:list-inside
+      [&_ul_ul]:ml-4 [&_ul_ol]:ml-4 [&_ol_ol]:ml-4 [&_ol_ul]:ml-4"
+  >
     <slot />
   </div>
 </Layout>

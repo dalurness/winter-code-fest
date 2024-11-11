@@ -1,6 +1,7 @@
 import { MdCalendarMonth, MdEventBusy } from "react-icons/md";
 import { Calendar } from "./Calendar";
 import { Link } from "./Link";
+import { Modal } from "./Modal";
 
 const { BASE_URL } = import.meta.env;
 
@@ -19,19 +20,19 @@ export function Navbar({ day }: NavbarProps) {
           <img src={BASE_URL + "logo.svg"} alt="Logo" className="w-10" />
           WCF
         </Link>
-        <details className="ml-auto group">
-          <summary className="list-none hover:text-yeti-dark-7 cursor-pointer">
-            <MdCalendarMonth size={32} className="group-open:hidden" />
-            <MdEventBusy size={32} className="hidden group-open:block" />
-
-            {/* fullscreen background element that you can click to close when it's open */}
-            <div className="fixed inset-0 bg-yeti-dark-3/50 hidden group-open:block"></div>
-          </summary>
-
+        <Modal
+          className="ml-auto"
+          button={
+            <div className="hover:text-yeti-dark-7 cursor-pointer">
+              <MdCalendarMonth size={32} className="group-open:hidden" />
+              <MdEventBusy size={32} className="hidden group-open:block" />
+            </div>
+          }
+        >
           <nav className="fixed right-0 left-0 md:left-auto z-10 flex flex-col bg-yeti-light-3 shadow-lg p-4 md:px-8 rounded-md md:rounded-r-none h-full w-screen md:max-w-screen-md">
             <Calendar current={day} />
           </nav>
-        </details>
+        </Modal>
       </div>
     </header>
   );
