@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Button } from "../Button";
 
 export default function () {
-  function AnswerInput({ fileName, solution }: { fileName: string, solution: string }) {
+  function AnswerInput({
+    fileName,
+    solution,
+  }: {
+    fileName: string;
+    solution: string;
+  }) {
     const [input, setInput] = useState("");
 
     function checkSolution() {
@@ -14,36 +20,46 @@ export default function () {
     }
 
     return (
-      <>
-        <b>{fileName}:</b>
-        <label className="mb-4">
-          Check your answer:
+      <div className="flex flex-col mb-4">
+        <label className="mb-2">
+          <b>{fileName}</b>
           <textarea
-            className="block p-4 rounded-lg"
+            className="block p-4 rounded-lg border border-yeti-light"
             placeholder="42"
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
           ></textarea>
         </label>
-        <Button onClick={checkSolution}>Submit</Button>
-      </>
-    )
+        <Button onClick={checkSolution} className="mr-auto">
+          Submit
+        </Button>
+      </div>
+    );
   }
 
   return (
     <>
-      {solutions.map(s => <AnswerInput key={s.fileName} fileName={s.fileName} solution={s.answerText} />)}
+      <h2 className="text-3xl mt-20 mb-5 border-b border-yeti-dark">
+        Check Your Answers
+      </h2>
+      {solutions.map((s) => (
+        <AnswerInput
+          key={s.fileName}
+          fileName={s.fileName}
+          solution={s.answerText}
+        />
+      ))}
     </>
-  )
+  );
 }
 
 const solutions: {
-  fileName: string,
-  answerText: string,
+  fileName: string;
+  answerText: string;
 }[] = [
-    {
-      fileName: "letters.txt",
-      answerText: `1: 16
+  {
+    fileName: "letters.txt",
+    answerText: `1: 16
     2: 9
     3: 12
     4: 14
@@ -238,11 +254,11 @@ const solutions: {
     193: 13
     194: 14
     195: 11
-    196: 12`
-    },
-    {
-      fileName: "letters_challenge.txt",
-      answerText: `1: 51189
+    196: 12`,
+  },
+  {
+    fileName: "letters_challenge.txt",
+    answerText: `1: 51189
     2: 51131
     3: 50970
     4: 51047
@@ -438,6 +454,6 @@ const solutions: {
     194: 51169
     195: 51000
     196: 51063
-    `
-    }
-  ]
+    `,
+  },
+];

@@ -4,15 +4,23 @@ set -eu
 
 cd "$(dirname "$0")"
 
-cd ../public
+main() {
+    if ! command -v magick > /dev/null; then
+        echo "ImageMagick required but not found"
+        exit 1
+    fi
 
-for size in 16 32; do
-    magick convert \
-        -background none \
-        -resize "${size}x${size}" \
-        logo.svg "favicon-${size}.png"
-done
+    cd ../public
 
-magick convert favicon-*.png favicon.ico
+    for size in 16 32; do
+        magick convert \
+            -background none \
+            -resize "${size}x${size}" \
+            logo.svg "favicon-${size}.png"
+    done
 
-rm favicon-*.png
+    magick convert favicon-*.png favicon.ico
+    rm favicon-*.png
+}
+
+main

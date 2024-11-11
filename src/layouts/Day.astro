@@ -23,15 +23,12 @@ const { day, title, resultComponent, solutionList } = Astro.props;
     <DynamicSolution resultComponent={resultComponent} client:load />
   )
 }
-<h2 class="text-3xl mt-20 border-b border-yeti-dark">Solutions</h2>
-<div class="mt-5 ml-4">
+<h2 class="text-3xl mt-20 mb-5 border-b border-yeti-dark">Solutions</h2>
+<ul class="mb-10 list-inside list-disc">
   {
     solutionList.map((s) => (
       <li>
-        <Link
-          href={`/day/${day}/solution/${s.username}/`}
-          className="text-yeti-light-9 hover:text-yeti-light-7"
-        >
+        <Link href={`/day/${day}/solution/${s.username}/`}>
           {s.username} -{" "}
           {s.descriptions.map((s) => (
             <span class="border-yeti-light-9 border-2 rounded-lg bg-yeti-light-3 px-1 mx-1">
@@ -42,4 +39,4 @@ const { day, title, resultComponent, solutionList } = Astro.props;
       </li>
     ))
   }
-</div>
+</ul>

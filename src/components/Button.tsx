@@ -12,7 +12,8 @@ export enum Size {
   large = "lg",
 }
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   color?: `${Color}`;
   size?: `${Size}`;
   pill?: boolean;
@@ -44,7 +45,7 @@ export function Button({
   );
 }
 
-interface LinkButtonProps
+export interface LinkButtonProps
   extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
   color?: `${Color}`;
   size?: `${Size}`;
@@ -63,9 +64,9 @@ export function LinkButton({
     <Link
       {...nativeProps}
       className={twMerge(
-        "text-center",
+        "text-center !no-underline",
         pill ? "rounded-full" : "rounded-lg",
-        color === Color.dark && "bg-yeti-dark text-white hover:bg-yeti-dark-7",
+        color === Color.dark && "bg-yeti-dark !text-white hover:bg-yeti-dark-7",
         // color === Color.light && "", // TODO
         size === Size.small && "px-2 py-1 text-sm",
         size === Size.medium && "px-4 py-3 text-base",
