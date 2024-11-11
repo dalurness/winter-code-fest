@@ -1,5 +1,5 @@
 ---
-descriptions: ["elixir", "I did another language too!", "and another!"]
+descriptions: ["elixir", "first time using language"]
 ---
 ```elixir
 writeString = case File.read("../letters.txt") do
