@@ -23,7 +23,7 @@ const { day, title, resultComponent, solutionList } = Astro.props;
     <DynamicSolution resultComponent={resultComponent} client:load />
   )
 }
-<h2 class="text-3xl mt-20 mb-5 border-b border-yeti-dark">Solutions</h2>
+<h2 class="mt-20">Solutions</h2>
 <ul class="mb-10 list-inside list-disc">
   {
     solutionList.map((s) => (

@@ -105,9 +105,7 @@ export default function () {
         </div>
       </Dialog>
 
-      <h2 className="text-3xl mt-20 mb-5 border-b border-yeti-dark">
-        Check Your Answers
-      </h2>
+      <h2 className="mt-20">Check Your Answers</h2>
       {solutions.map((s) => (
         <AnswerInput
           key={s.fileName}
