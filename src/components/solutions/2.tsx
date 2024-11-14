@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Button } from "../Button";
-import { Dialog } from "../Dialog";
-import { MdOutlineDangerous, MdOutlineVerified } from "react-icons/md";
+import { ModalStatusType, RightWrongModal } from "../RightWrongModal";
 
 export default function () {
-  const [showModal, setShowModal] = useState<"correct" | "incorrect" | null>(
-    null
+  const [showModal, setShowModal] = useState<ModalStatusType>(
+    ModalStatusType.Closed
   );
 
   function AnswerInput({
@@ -23,7 +22,7 @@ export default function () {
         correct = true;
       }
 
-      setShowModal(correct ? "correct" : "incorrect");
+      setShowModal(correct ? ModalStatusType.Correct : ModalStatusType.Incorrect);
     }
 
     return (
@@ -47,29 +46,7 @@ export default function () {
 
   return (
     <>
-      <Dialog
-        open={showModal != null}
-        onToggle={(open) => !open && setShowModal(null)}
-      >
-        <div className="flex flex-col items-center px-4 py-3 sm:px-6">
-          {showModal === "correct" ? (
-            <>
-              <MdOutlineVerified size={48} className="text-teal-600 mb-4" />
-              <span>You got it right!</span>
-            </>
-          ) : (
-            <>
-              <MdOutlineDangerous size={48} className="text-red-600 mb-4" />
-              <span>Uh oh! That's not right</span>
-            </>
-          )}
-        </div>
-        <div className="flex justify-end bg-yeti-light-3 mt-3 px-4 py-3 sm:px-6">
-          <Button onClick={() => setShowModal(null)}>
-            {showModal === "correct" ? "Yay!" : "Try again"}
-          </Button>
-        </div>
-      </Dialog>
+      <RightWrongModal showModal={showModal} setShowModal={setShowModal} />
 
       <h2 className="mt-20">Check Your Answers</h2>
       {solutions.map((s) => (
@@ -87,15 +64,15 @@ const solutions: {
   fileName: string;
   txt: string;
 }[] = [
-  {
-    fileName: "small_message_encoded.txt",
-    txt: `Happy day 2!
+    {
+      fileName: "small_message_encoded.txt",
+      txt: `Happy day 2!
 
 Only 23 more days until the Christmas!`,
-  },
-  {
-    fileName: "large_message_encoded.txt",
-    txt: `The Polar Express  by Chris Van Allsburg
+    },
+    {
+      fileName: "large_message_encoded.txt",
+      txt: `The Polar Express  by Chris Van Allsburg
 
  
 
@@ -158,5 +135,5 @@ Only 23 more days until the Christmas!`,
      “Yes,” said my father, “it’s broken.”
 
      When I’d shaken the bell, my parents had not heard a sound.`
-  },
-];
+    },
+  ];
