@@ -7,7 +7,7 @@ const days = await getCollection("days");
 const titles = days.reduce(
   (titles, { slug, data }) => ({
     ...titles,
-    [slug]: data.title,
+    [Number(slug)]: data.title,
   }),
   {} as Record<number, string>
 );
@@ -91,9 +91,9 @@ export function Calendar({ current, className }: CalendarProps) {
           return (
             <Link
               key={yyyymmdd(date)}
-              href={`/day/${day}`}
+              href={`/day/${day.toString().padStart(2, "0")}`}
               className={twMerge(
-                "flex flex-col items-start w-full h-full px-3 py-2 relative focus:z-10 !text-yeti-dark !no-underline",
+                "flex flex-col items-start w-full h-full px-3 py-2 relative focus:z-10 !text-yeti-dark !no-underline break-words",
                 current <= day && "bg-white hover:bg-yeti-light-1",
                 current > day &&
                   "bg-yeti-dark-1 hover:bg-yeti-dark-3 !text-white",
@@ -112,7 +112,7 @@ export function Calendar({ current, className }: CalendarProps) {
                 {day}
               </time>
               {day in titles && (
-                <div className="text-sm mt-2 hidden md:block">
+                <div className="text-sm mt-2 hidden md:block w-full">
                   {titles[day]}
                 </div>
               )}

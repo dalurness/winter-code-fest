@@ -1,7 +1,9 @@
 ---
 import { getCollection } from "astro:content";
 import LayoutNavbarLayout from "../../../layouts/LayoutNavbar.astro";
-import DayLayout from "../../../layouts/Day.astro";
+import Question from "../../../components/Question.astro";
+import { DynamicSolution } from "../../../components/DynamicSolution";
+import { Link } from "../../../components/Link";
 
 export async function getStaticPaths() {
   const blogEntries = await getCollection("days");
@@ -29,12 +31,27 @@ const { title } = entry.data;
 ---
 
 <LayoutNavbarLayout day={day} title={title}>
-  <DayLayout
-    day={day}
-    title={title}
-    resultComponent={entry.slug}
-    solutionList={solutionList}
-  >
+  <Question day={day} title={title}>
     <Content />
-  </DayLayout>
+  </Question>
+
+  <DynamicSolution day={day} client:load />
+
+  <h2 class="mt-20">Solutions</h2>
+  <ul class="mb-10 list-inside list-disc">
+    {
+      solutionList.map(({ username, descriptions }) => (
+        <li>
+          <Link href={`./solution/${username}/`}>
+            {username} -{" "}
+            {descriptions.map((description) => (
+              <span class="border-yeti-light-9 border-2 rounded-lg bg-yeti-light-3 px-1 mx-1">
+                {description}
+              </span>
+            ))}
+          </Link>
+        </li>
+      ))
+    }
+  </ul>
 </LayoutNavbarLayout>
