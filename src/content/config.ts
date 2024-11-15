@@ -12,7 +12,7 @@ const communitySolutionsCollection = defineCollection({
   schema: z.object({
     descriptions: z.array(z.string()),
   }),
-})
+});
 
 export const collections = {
   days: daysCollection,

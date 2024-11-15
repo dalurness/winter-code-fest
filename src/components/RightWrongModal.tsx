@@ -9,9 +9,9 @@ export enum ModalStatusType {
 }
 
 type Props = {
-  showModal: `${ModalStatusType}`,
-  setShowModal: React.Dispatch<React.SetStateAction<ModalStatusType>>,
-}
+  showModal: `${ModalStatusType}`;
+  setShowModal: React.Dispatch<React.SetStateAction<ModalStatusType>>;
+};
 export function RightWrongModal({ showModal, setShowModal }: Props) {
   return (
     <Dialog
@@ -37,5 +37,5 @@ export function RightWrongModal({ showModal, setShowModal }: Props) {
         </Button>
       </div>
     </Dialog>
-  )
+  );
 }

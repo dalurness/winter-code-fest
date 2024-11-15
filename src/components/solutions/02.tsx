@@ -22,7 +22,9 @@ export default function () {
         correct = true;
       }
 
-      setShowModal(correct ? ModalStatusType.Correct : ModalStatusType.Incorrect);
+      setShowModal(
+        correct ? ModalStatusType.Correct : ModalStatusType.Incorrect
+      );
     }
 
     return (
@@ -50,11 +52,7 @@ export default function () {
 
       <h2 className="mt-20">Check Your Answers</h2>
       {solutions.map((s) => (
-        <AnswerInput
-          key={s.fileName}
-          fileName={s.fileName}
-          solution={s.txt}
-        />
+        <AnswerInput key={s.fileName} fileName={s.fileName} solution={s.txt} />
       ))}
     </>
   );
@@ -64,15 +62,15 @@ const solutions: {
   fileName: string;
   txt: string;
 }[] = [
-    {
-      fileName: "small_message_encoded.txt",
-      txt: `Happy day 2!
+  {
+    fileName: "small_message_encoded.txt",
+    txt: `Happy day 2!
 
 Only 23 more days until the Christmas!`,
-    },
-    {
-      fileName: "large_message_encoded.txt",
-      txt: `The Polar Express  by Chris Van Allsburg
+  },
+  {
+    fileName: "large_message_encoded.txt",
+    txt: `The Polar Express  by Chris Van Allsburg
 
  
 
@@ -134,6 +132,6 @@ Only 23 more days until the Christmas!`,
 
      “Yes,” said my father, “it’s broken.”
 
-     When I’d shaken the bell, my parents had not heard a sound.`
-    },
-  ];
+     When I’d shaken the bell, my parents had not heard a sound.`,
+  },
+];

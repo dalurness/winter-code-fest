@@ -1,6 +1,7 @@
 ---
 descriptions: ["elixir", "first time using language"]
 ---
+
 ```elixir
 writeString = case File.read("../letters.txt") do
   {:ok, body} -> body
