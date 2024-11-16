@@ -21,9 +21,14 @@ const { title, day } = Astro.props;
       [&_a]:text-yeti-light-9 [&_a:hover]:underline
       [&_pre:has(code)]:p-4 [&_pre]:rounded-lg [&_pre]:!bg-yeti-dark-7 [&_pre]:!text-white
       [&_:not(pre)>code]:bg-yeti-dark-7 [&_:not(pre)>code]:text-white [&_:not(pre)>code]:rounded [&_:not(pre)>code]:px-1
-      [&_ul]:list-disc [&_ul]:list-inside
-      [&_ol]:list-decimal [&_ol]:list-inside
-      [&_ul_ul]:ml-4 [&_ul_ol]:ml-4 [&_ol_ol]:ml-4 [&_ol_ul]:ml-4"
+      [&_ul]:list-disc [&_ul]:pl-5
+      [&_ol]:list-decimal [&_ol]:pl-5
+      [&_table]:border [&_table]:border-yeti-dark-1
+      [&_table]:divide-y-2 [&_table]:divide-yeti-dark-1 [&_table_tbody]:divide-y [&_table_tbody]:divide-yeti-dark-1
+      [&_table_tr]:divide-x [&_table_tr]:divide-yeti-dark-1
+      [&_table_tr:nth-child(odd)]:bg-yeti-light-3
+      [&_table_th]:py-2 [&_table_th]:px-3
+      [&_table_td]:py-2 [&_table_td]:px-3"
   >
     <slot />
   </div>
