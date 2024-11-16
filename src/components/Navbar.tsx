@@ -29,7 +29,7 @@ export function Navbar({ day }: NavbarProps) {
             </div>
           }
         >
-          <nav className="fixed right-0 left-0 md:left-auto z-10 flex flex-col bg-yeti-light-3 shadow-lg p-4 md:px-8 rounded-md md:rounded-r-none h-full w-screen md:max-w-screen-md">
+          <nav className="fixed right-0 left-0 md:left-auto z-10 flex flex-col bg-yeti-light-3 shadow-lg p-4 md:px-8 rounded-md md:rounded-r-none h-full w-screen md:max-w-screen-lg">
             <Calendar current={day} />
           </nav>
         </Modal>
