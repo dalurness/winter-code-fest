@@ -96,7 +96,7 @@ export function Calendar({ current, className }: CalendarProps) {
                 "flex flex-col items-start w-full h-full px-3 py-2 relative focus:z-10 !text-yeti-dark !no-underline break-words",
                 current <= day && "bg-white hover:bg-yeti-light-1",
                 current > day &&
-                  "bg-yeti-dark-1 hover:bg-yeti-dark-3 !text-white",
+                  "bg-yeti-dark-1 hover:bg-yeti-dark-3 !text-white after:absolute after:inset-0 after:bg-strike-out",
                 i === dates.length - 7 && "rounded-bl-lg",
                 i === dates.length - 1 && "rounded-br-lg"
               )}
@@ -115,9 +115,6 @@ export function Calendar({ current, className }: CalendarProps) {
                 <div className="text-sm mt-2 hidden md:block w-full">
                   {titles[day]}
                 </div>
-              )}
-              {current > day && (
-                <span className="absolute w-full h-px bg-yeti-dark top-1/2 left-0 right-0 -rotate-45"></span>
               )}
             </Link>
           );

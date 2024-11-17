@@ -29,6 +29,9 @@ export default {
       fontFamily: {
         poppins: ["Poppins", ...defaultTheme.fontFamily.sans],
       },
+      backgroundImage: ({ theme }) => ({
+        "strike-out": `linear-gradient(to top left, transparent calc(50% - 1px), ${theme("colors.yeti.dark.7")}, transparent calc(50% + 1px))`,
+      }),
     },
   },
   plugins: [],

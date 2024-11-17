@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import LayoutNavbarLayout from "../../../../layouts/LayoutNavbar.astro";
-import QuestionLayout from "../../../../components/Question.astro";
+import Question from "../../../../components/Question.astro";
 import { Link } from "../../../../components/Link";
 
 export async function getStaticPaths() {
@@ -42,7 +42,7 @@ const { Content } = await entry.render();
       <Content />
     </div>
   </div>
-  <QuestionLayout day={day} title={title}>
+  <Question day={day} title={title}>
     <QuestionContent />
-  </QuestionLayout>
+  </Question>
 </LayoutNavbarLayout>
