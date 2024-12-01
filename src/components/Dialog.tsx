@@ -3,9 +3,9 @@ import { Modal, type ModalProps } from "./Modal";
 export interface DialogProps extends ModalProps {}
 
 /**
- * Open a dialog popup that can be dimissed by clicking outside of it.
+ * Open a dialog popup that can be dismissed by clicking outside of it.
  *
- * This is opened programatically and the content is centered on the screen.
+ * This is opened programmatically and the content is centered on the screen.
  */
 export function Dialog({
   open = false,
