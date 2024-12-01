@@ -1,9 +1,10 @@
 ---
 import { getCollection } from "astro:content";
-import LayoutNavbarLayout from "../../../layouts/LayoutNavbar.astro";
+import LayoutNavbar from "../../../layouts/LayoutNavbar.astro";
 import Question from "../../../components/Question.astro";
 import { DynamicSolution } from "../../../components/DynamicSolution";
 import { Link } from "../../../components/Link";
+import { DayAheadDialog } from "../../../components/DayAheadDialog";
 
 export async function getStaticPaths() {
   const blogEntries = await getCollection("days");
@@ -27,10 +28,14 @@ const solutionList = solutions.map((s) => {
 const { Content } = await entry.render();
 
 const day = Number(entry.slug);
+console.log(entry.slug, day);
+
 const { title } = entry.data;
 ---
 
-<LayoutNavbarLayout day={day} title={title}>
+<LayoutNavbar day={day} title={title}>
+  <DayAheadDialog day={day} client:load />
+
   <Question day={day} title={title}>
     <Content />
   </Question>

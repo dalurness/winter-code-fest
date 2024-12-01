@@ -33,7 +33,7 @@ export function RightWrongModal({ showModal, setShowModal }: Props) {
       </div>
       <div className="flex justify-end bg-yeti-light-3 mt-3 px-4 py-3 sm:px-6">
         <Button onClick={() => setShowModal(ModalStatusType.Closed)}>
-          {showModal === "correct" ? "Yay!" : "Try again"}
+          {showModal === ModalStatusType.Correct ? "Yay!" : "Try again"}
         </Button>
       </div>
     </Dialog>
