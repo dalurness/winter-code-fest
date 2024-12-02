@@ -43,7 +43,10 @@ fn decode_file(filename: String) {
         [] -> ""
       }
     })
-    |> io.debug
+    // this isn't my favorite solution, but in order to handle the backslashes
+    // this piece goes through the list and looks for two consecutive items that
+    // are empty strings. This is created from splitting on the backslash, so if there
+    // are two in a row, we know that it was actually an escaped backslash.
     |> list.map_fold(False, fn(has_first, item) {
       case item {
         "" -> {
