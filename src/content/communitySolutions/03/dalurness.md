@@ -3,11 +3,14 @@ descriptions: ["gleam"]
 ---
 
 ### 2024 Solution Gleam
+
 #### Output
+
 ```
 17
 Adds: 355, Removes: 174
 ```
+
 ```gleam
 import gleam/dict
 import gleam/int
