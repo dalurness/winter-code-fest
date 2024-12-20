@@ -4,6 +4,35 @@ descriptions: ["gleam"]
 
 ### 2024 Solution Gleam
 
+```gleam
+import gleam/int
+import gleam/io
+import gleam/list
+import gleam/string
+import simplifile
+
+pub fn main() {
+  let filename = "bin.txt"
+  case simplifile.read(filename) {
+    Ok(file_contents) -> file_contents
+    Error(_) -> {
+      io.println("failed to read file: " <> filename)
+      panic as "failed to read file"
+    }
+  }
+  |> string.split("")
+  |> list.sized_chunk(8)
+  |> list.map(fn(l) {
+    let joined_str = string.join(l, "")
+    let assert Ok(int_val) = int.base_parse(joined_str, 2)
+    let assert Ok(cp) = string.utf_codepoint(int_val)
+    cp
+  })
+  |> string.from_utf_codepoints
+  |> io.println
+}
+```
+
 #### Output
 
 ```
@@ -124,33 +153,4 @@ Christopher: NICE
 Naomi: NICE
 Andrew: NAUGHTY
 Madison: NICE
-```
-
-```gleam
-import gleam/int
-import gleam/io
-import gleam/list
-import gleam/string
-import simplifile
-
-pub fn main() {
-  let filename = "bin.txt"
-  case simplifile.read(filename) {
-    Ok(file_contents) -> file_contents
-    Error(_) -> {
-      io.println("failed to read file: " <> filename)
-      panic as "failed to read file"
-    }
-  }
-  |> string.split("")
-  |> list.sized_chunk(8)
-  |> list.map(fn(l) {
-    let joined_str = string.join(l, "")
-    let assert Ok(int_val) = int.base_parse(joined_str, 2)
-    let assert Ok(cp) = string.utf_codepoint(int_val)
-    cp
-  })
-  |> string.from_utf_codepoints
-  |> io.println
-}
 ```
