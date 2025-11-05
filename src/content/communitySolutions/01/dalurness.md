@@ -18,10 +18,9 @@ pub fn main() !void {
 
     var map = std.AutoHashMap(usize, usize).init(allocator);
     defer map.deinit();
-    var loopCount: usize = 0;
+
     var start_chunk: usize = 0;
     while (true) {
-        loopCount += 1;
         const bytes_read = try file.read(buffer[start_chunk..]);
 
         // only break if there is nothing else to read AND there are no more carry-over vals left in the buffer
@@ -38,11 +37,9 @@ pub fn main() !void {
                 }
                 const key = try std.fmt.parseInt(usize, full_token, 10);
 
-                if (map.contains(key)) {
-                    const value_ptr = map.getPtr(key);
-                    if (value_ptr) |value| {
-                        value.* += 1;
-                    }
+                const value_ptr = map.getPtr(key);
+                if (value_ptr) |value| {
+                    value.* += 1;
                 } else {
                     try map.put(key, 1);
                 }
