@@ -3,6 +3,7 @@ descriptions: ["zig", "gleam", "elixir", "first time using language"]
 ---
 
 ### 2025 Solution Zig
+
 ```zig
 const std = @import("std");
 
