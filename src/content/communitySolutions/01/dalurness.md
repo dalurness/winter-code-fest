@@ -18,10 +18,9 @@ pub fn main() !void {
 
     var map = std.AutoHashMap(usize, usize).init(allocator);
     defer map.deinit();
-    var loopCount: usize = 0;
+
     var start_chunk: usize = 0;
     while (true) {
-        loopCount += 1;
         const bytes_read = try file.read(buffer[start_chunk..]);
 
         // only break if there is nothing else to read AND there are no more carry-over vals left in the buffer
