@@ -37,11 +37,9 @@ pub fn main() !void {
                 }
                 const key = try std.fmt.parseInt(usize, full_token, 10);
 
-                if (map.contains(key)) {
-                    const value_ptr = map.getPtr(key);
-                    if (value_ptr) |value| {
-                        value.* += 1;
-                    }
+                const value_ptr = map.getPtr(key);
+                if (value_ptr) |value| {
+                    value.* += 1;
                 } else {
                     try map.put(key, 1);
                 }
