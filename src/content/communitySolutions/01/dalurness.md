@@ -1,6 +1,76 @@
 ---
-descriptions: ["gleam", "elixir", "first time using language"]
+descriptions: ["zig", "gleam", "elixir", "first time using language"]
 ---
+
+### 2025 Solution Zig
+
+```zig
+const std = @import("std");
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    const file = try std.fs.cwd().openFile("letters_challenge.txt", .{ .mode = .read_only });
+    defer file.close();
+
+    const buffer_size = 4096;
+    var buffer: [buffer_size]u8 = undefined;
+
+    var map = std.AutoHashMap(usize, usize).init(allocator);
+    defer map.deinit();
+    var loopCount: usize = 0;
+    var start_chunk: usize = 0;
+    while (true) {
+        loopCount += 1;
+        const bytes_read = try file.read(buffer[start_chunk..]);
+
+        // only break if there is nothing else to read AND there are no more carry-over vals left in the buffer
+        if ((bytes_read == 0) and (start_chunk == 0)) break;
+
+        var chunk: []u8 = buffer[0..(bytes_read + start_chunk)];
+        var token_start: usize = 0;
+        for (chunk, 0..) |c, i| {
+            // need to catch if these are the leftover vals
+            if (c == ' ' or (i == (chunk.len - 1) and bytes_read == 0)) {
+                var full_token = chunk[token_start..i];
+                if (token_start == i) {
+                    full_token = chunk;
+                }
+                const key = try std.fmt.parseInt(usize, full_token, 10);
+
+                if (map.contains(key)) {
+                    const value_ptr = map.getPtr(key);
+                    if (value_ptr) |value| {
+                        value.* += 1;
+                    }
+                } else {
+                    try map.put(key, 1);
+                }
+                token_start = i + 1;
+            }
+
+            // check if this is the last iteration
+            if (i == (chunk.len - 1)) {
+                // copy all leftover items to the beginning of chunk
+                start_chunk = chunk.len - token_start;
+
+                var j: usize = 0;
+                while (token_start < chunk.len) {
+                    chunk[j] = chunk[token_start];
+                    token_start = token_start + 1;
+                    j = j + 1;
+                }
+            }
+        }
+    }
+
+    var mapit = map.iterator();
+    while (mapit.next()) |entry| {
+        std.debug.print("{}: {}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
+    }
+}
+
+```
 
 ### 2024 Solution Gleam
 
