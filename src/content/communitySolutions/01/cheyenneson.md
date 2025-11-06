@@ -22,7 +22,7 @@ fn main() {
         } else {
             letters.insert(value.to_string(), 1);
         }
-        
+
     }
 
     let mut sorted: Vec<_> = letters.iter().collect();
