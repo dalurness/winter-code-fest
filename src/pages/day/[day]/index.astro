@@ -4,7 +4,7 @@ import LayoutNavbar from "../../../layouts/LayoutNavbar.astro";
 import Question from "../../../components/Question.astro";
 import { DynamicSolution } from "../../../components/DynamicSolution";
 import { Link } from "../../../components/Link";
-import { DayAheadDialog } from "../../../components/DayAheadDialog";
+// import { DayAheadDialog } from "../../../components/DayAheadDialog";
 
 export async function getStaticPaths() {
   const blogEntries = await getCollection("days");
@@ -70,4 +70,4 @@ const { title } = entry.data;
       </div>
     </div>
   </div>
-</LayoutNavbarLayout>
+</LayoutNavbar>
