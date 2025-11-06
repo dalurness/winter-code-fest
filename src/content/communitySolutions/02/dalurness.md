@@ -1,6 +1,71 @@
 ---
-descriptions: ["gleam"]
+descriptions: ["zig", "gleam"]
 ---
+
+## 2025 Solution Zig
+
+```zig
+
+const std = @import("std");
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+    var char_mapping: std.AutoHashMap(usize, u8) = blk: {
+        var entries: std.AutoHashMap(usize, u8) = std.AutoHashMap(usize, u8).init(allocator);
+
+        var i: usize = 0;
+        // a–z -> 0–25
+        for ('a'..'z' + 1) |ch| {
+            const ch_u8: u8 = @intCast(ch);
+            try entries.put(i, ch_u8);
+            i += 1;
+        }
+        // A–Z -> 26–51
+        for ('A'..'Z' + 1) |ch| {
+            const ch_u8: u8 = @intCast(ch);
+            try entries.put(i, ch_u8);
+            i += 1;
+        }
+
+        break :blk entries;
+    };
+    defer char_mapping.deinit();
+
+    const original_file = @embedFile("large_message_encoded.txt");
+    var file: [original_file.len]u8 = original_file.*;
+
+    var write_ptr: usize = 0;
+    var i: usize = 0;
+    while (i < file.len) {
+        switch (file[i]) {
+            '\\' => {
+                if (i + 1 < file.len and file[i + 1] == '\\') {
+                    file[write_ptr] = '\\';
+                    write_ptr += 1;
+                    i += 1;
+                } else {
+                    // get full code
+                    const encoded_value = file[i + 1 .. i + 3];
+                    const decoded_value = try std.fmt.parseInt(usize, encoded_value, 10);
+                    file[write_ptr] = char_mapping.get(decoded_value) orelse return error.InvalidMapping;
+                    write_ptr += 1;
+                    i += 3;
+                }
+            },
+            else => {
+                file[write_ptr] = file[i];
+                write_ptr += 1;
+                i += 1;
+            },
+        }
+    }
+
+    const decoded_message = file[0..write_ptr];
+    for (decoded_message) |c| {
+        std.debug.print("{c}", .{c});
+    }
+}
+```
 
 ### 2024 Solution Gleam
 
