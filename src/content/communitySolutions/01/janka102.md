@@ -1,8 +1,113 @@
 ---
-descriptions: ["linux-x86-assembly", "gleam"]
+descriptions: ["linux-x86-assembly", "gleam", "ruby"]
 ---
 
+## 2025
+
+Used Ruby this year. [RuboCop](https://rubocop.org/) is pretty nifty, it transformed a few of my `if` statements into `unless`s.
+
+Initial setup in VSCode took a bit to get working, and I still don't have type help which I was expecting. It shows info for stdlib stuff, but not any of my own classes or variables.
+
+```ruby
+require 'optparse'
+
+class Day01
+  def initialize(filename)
+    @filename = filename
+  end
+
+  def solve(verbose)
+    total = 0
+    counts = []
+
+    File.open(@filename).each(' ').with_index do |code, i|
+      country = code.to_i
+
+      counts.fill(0, counts.size..country) unless counts.size > country
+      counts[country] += 1
+
+      next unless verbose
+
+      total = i + 1
+      $stderr.write "\rprocessed: #{total}" if (total % 10_000).zero?
+    end.close
+
+    warn "\rprocessed: #{total}" if verbose
+
+    counts.each.with_index do |count, i|
+      puts "#{i}: #{count}" unless count.zero?
+    end
+  end
+end
+
+# Expects the input files to be named 01.txt and 01_challenge.txt and in the current working directory
+if __FILE__ == $PROGRAM_NAME
+  options = {}
+  OptionParser.new do |parser|
+    parser.banner = "Usage: #{$PROGRAM_NAME} [options]"
+
+    parser.on('-c', '--challenge', 'Solve with the challenge input') do
+      options[:challenge] = true
+    end
+
+    parser.on('-v', '--verbose', 'Enable verbose logging') do
+      options[:verbose] = true
+    end
+  end.parse!
+
+  challenge = Day01.new("01#{options[:challenge] ? '_challenge' : ''}.txt")
+  challenge.solve options[:verbose]
+end
+```
+
+## 2024
+
+<details>
+<summary>Show Gleam Solution</summary>
+
+First time using Gleam. I think there's room for improvement in my solution, but it's a start. I also see the similarity to elixir, but it's cool they have compile-to-js.
+
+I didn't get file reading working at this time, so just copy/paste the contents of the file into the string.
+
+```gleam
+import gleam/io
+import gleam/string
+import gleam/dict
+import gleam/list
+import gleam/option.{Some, None}
+import gleam/result
+import gleam/pair
+import gleam/int
+
+pub fn main() {
+  // Copy/paste the contents of the file into the string here
+  let letters = "..."
+  let increment = fn(x) {
+    case x {
+      Some(i) -> i + 1
+      None -> 1
+    }
+  }
+
+  string.split(letters, on: " ")
+  |> list.map(fn(code) { result.unwrap(int.parse(code), or: -1) })
+  |> list.fold(dict.new(), fn(acc, code) { dict.upsert(acc, code, increment) })
+  |> dict.to_list()
+  |> list.sort(by: fn(e1, e2) { int.compare(pair.first(e1), pair.first(e2)) })
+  |> list.map(fn(e) { int.to_string(pair.first(e)) <> ": " <> int.to_string(pair.second(e)) })
+  |> string.join(with: "\n")
+  |> io.print()
+}
+```
+
+One question I had while writing it: Why do I need to import `Some` and `None`? Loose experimenting shows I don't need to do that with `Ok` and `Error`.
+
+</details>
+
 ## 2023
+
+<details>
+<summary>Show Assembly Solution</summary>
 
 First solution in assembly. Linux only, sorry Windows users. It's not perfect, and I cheat a little bit by not formatting the output, but it works well enough.
 
@@ -107,41 +212,4 @@ path:
 	.string "./input.txt"
 ```
 
-## 2024
-
-First time using Gleam. I think there's room for improvement in my solution, but it's a start. I also see the similarity to elixir, but it's cool they have compile-to-js.
-
-I didn't get file reading working at this time, so just copy/paste the contents of the file into the string.
-
-```gleam
-import gleam/io
-import gleam/string
-import gleam/dict
-import gleam/list
-import gleam/option.{Some, None}
-import gleam/result
-import gleam/pair
-import gleam/int
-
-pub fn main() {
-  // Copy/paste the contents of the file into the string here
-  let letters = "..."
-  let increment = fn(x) {
-    case x {
-      Some(i) -> i + 1
-      None -> 1
-    }
-  }
-
-  string.split(letters, on: " ")
-  |> list.map(fn(code) { result.unwrap(int.parse(code), or: -1) })
-  |> list.fold(dict.new(), fn(acc, code) { dict.upsert(acc, code, increment) })
-  |> dict.to_list()
-  |> list.sort(by: fn(e1, e2) { int.compare(pair.first(e1), pair.first(e2)) })
-  |> list.map(fn(e) { int.to_string(pair.first(e)) <> ": " <> int.to_string(pair.second(e)) })
-  |> string.join(with: "\n")
-  |> io.print()
-}
-```
-
-One question I had while writing it: Why do I need to import `Some` and `None`? Loose experimenting shows I don't need to do that with `Ok` and `Error`.
+</details>
