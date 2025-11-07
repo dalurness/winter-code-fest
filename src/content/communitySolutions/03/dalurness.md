@@ -1,6 +1,57 @@
 ---
-descriptions: ["gleam"]
+descriptions: ["zig", "gleam"]
 ---
+
+### 2025 Solution Zig
+
+### Output
+
+```
+Total Valid: 14 Adds: 355 Removes: 174
+```
+
+```zig
+const std = @import("std");
+const derror = std.io.Reader.DelimiterError;
+
+pub fn main() !void {
+    var file = try std.fs.cwd().openFile("./src/assembly_codes.txt", .{ .mode = .read_only });
+    defer file.close();
+
+    var buf: [1024 * 1024]u8 = undefined;
+    var reader = file.reader(&buf);
+
+    var total_valid: usize = 0;
+    var add_count: usize = 0;
+    var remove_count: usize = 0;
+    outer: while (reader.interface.takeDelimiterExclusive('\n')) |line| {
+        const body = line[0..(line.len - 2)];
+        // part 2 logic
+        for (body) |c| switch (c) {
+            'A', 'C' => add_count += 1,
+            'R', 'P' => remove_count += 1,
+            else => return error.InvalidCharater,
+        };
+
+        // part 1 logic
+        if (line[line.len - 1] != 'P') continue;
+        if (line[line.len - 2] != 'C') continue;
+        var parts: usize = 0;
+        for (body) |c| {
+            switch (c) {
+                'C', 'P' => continue :outer,
+                'A' => parts += 1,
+                'R' => parts -= 1,
+                else => return error.InvalidCharacter,
+            }
+            if (parts < 0) continue :outer;
+        }
+        total_valid += 1;
+    } else |err| if (err != error.EndOfStream) return err;
+
+    std.debug.print("Total Valid: {} Adds: {} Removes: {}", .{ total_valid, add_count, remove_count });
+}
+```
 
 ### 2024 Solution Gleam
 
