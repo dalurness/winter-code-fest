@@ -1,8 +1,69 @@
 ---
-descriptions: ["gleam"]
+descriptions: ["gleam", "ruby"]
 ---
 
-# 2024
+## 2025
+
+Ruby again... I'm starting to get familiar with the docs now. I couldn't get debugging in VSCode working, so `irb` was my friend this time.
+
+This goes though character-by-character and keeps track of the previous along with the current. That is enough to keep all the state you need to decode the message. I belive this streams the file reading, and it prints each character as it finds it, so it streams the output too.
+
+```ruby
+require 'optparse'
+
+class Day02
+  def initialize(filename)
+    @filename = filename
+  end
+
+  def solve
+    mapping = ('a'..'z').chain('A'..'Z').to_a
+
+    prev = nil
+    File.open(@filename).each_char do |c|
+      if prev.nil?
+        if c == '\\'
+          prev = c
+        else
+          $stdout.write c
+        end
+      elsif prev == '\\'
+        if c == '\\'
+          $stdout.write c
+        else
+          prev = c
+        end
+      else
+        symbol = Integer(prev + c, 10)
+        raise "Invalid encoding: #{prev + c}" if symbol.negative? || (symbol >= mapping.size)
+
+        $stdout.write mapping[symbol]
+        prev = nil
+      end
+    end.close
+  end
+end
+
+# Expects the input files to be named 02.txt and 02_challenge.txt and in the current working directory
+if __FILE__ == $PROGRAM_NAME
+  options = {}
+  OptionParser.new do |parser|
+    parser.banner = "Usage: #{$PROGRAM_NAME} [options]"
+
+    parser.on('-c', '--challenge', 'Solve with the challenge input') do
+      options[:challenge] = true
+    end
+  end.parse!
+
+  challenge = Day02.new("02#{options[:challenge] ? '_challenge' : ''}.txt")
+  challenge.solve
+end
+```
+
+## 2024
+
+<details>
+<summary>Show Gleam Solution</summary>
 
 This uses a state machine to parse the input.
 
@@ -65,3 +126,5 @@ pub fn main() {
   }
 }
 ```
+
+</details>
