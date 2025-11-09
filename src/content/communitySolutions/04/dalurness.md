@@ -7,7 +7,7 @@ descriptions: ["zig"]
 ### Output
 
 ```
-Total Time: 2110
+Total Time: 2803
 ```
 
 ```zig
@@ -56,15 +56,15 @@ pub fn main() !void {
         .workload = 0,
     };
     var elf2: Elf = .{
-        .speed = 1.4,
+        .speed = 0.7,
         .workload = 0,
     };
     var elf3: Elf = .{
-        .speed = 1.4,
+        .speed = 1.1,
         .workload = 0,
     };
     var elf4: Elf = .{
-        .speed = 1.4,
+        .speed = 1.0,
         .workload = 0,
     };
 
