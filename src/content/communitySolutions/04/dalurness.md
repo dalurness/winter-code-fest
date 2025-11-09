@@ -51,7 +51,7 @@ pub fn main() !void {
             }
         }
     }
-     var elf1: Elf = .{
+    var elf1: Elf = .{
         .speed = 1.4,
         .workload = 0,
     };
