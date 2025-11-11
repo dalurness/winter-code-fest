@@ -1,6 +1,69 @@
 ---
-descriptions: ["go"]
+descriptions: ["zig", "go"]
 ---
+
+### 2025 Solution Zig
+
+```zig
+const std = @import("std");
+
+pub fn main() !void {
+    var file = try std.fs.cwd().openFile("./src/trees.txt", .{ .mode = .read_only });
+    defer file.close();
+
+    var buf: [1024]u8 = undefined;
+    var reader = file.reader(&buf);
+
+    var off_balance_total: isize = 0;
+    var lw: isize = 0;
+    var rw: isize = 0;
+    var tw: isize = 0;
+    var nums: [4]isize = undefined;
+
+    while (reader.interface.takeDelimiterExclusive('\n')) |line| {
+        switch (line.len) {
+            1 => {
+                nums[0] = try parseNum(line[0]);
+                tw += nums[0];
+            },
+            3 => {
+                nums[0] = try parseNum(line[0]);
+                nums[1] = try parseNum(line[2]);
+                lw += nums[0];
+                rw += nums[1];
+            },
+            7 => {
+                nums[0] = try parseNum(line[0]);
+                nums[1] = try parseNum(line[2]);
+                nums[2] = try parseNum(line[4]);
+                nums[3] = try parseNum(line[6]);
+                lw += (nums[0] + nums[1]);
+                rw += (nums[2] + nums[3]);
+
+                // finish calcs for this tree
+                if (@abs(lw - rw) > 1) {
+                    off_balance_total += (lw + rw + tw);
+                }
+                lw = 0;
+                rw = 0;
+                tw = 0;
+            },
+            0 => {},
+            else => return error.UnexpectedWeight,
+        }
+    } else |err| if (err != error.EndOfStream) return err;
+
+    std.debug.print("Total Off Balance Weight: {}\n", .{off_balance_total});
+}
+
+fn parseNum(c: u8) !isize {
+    if (c == '_') return 0;
+    return try std.fmt.parseInt(isize, &[_]u8{c}, 10);
+}
+
+```
+
+### 2024 Solution Go
 
 ```go
 package main
