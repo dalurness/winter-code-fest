@@ -4,6 +4,12 @@ descriptions: ["zig", "go"]
 
 ### 2025 Solution Zig
 
+#### Output
+
+```
+Total Off Balance Weight: 580
+```
+
 ```zig
 const std = @import("std");
 
