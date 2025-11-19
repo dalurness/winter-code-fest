@@ -72,3 +72,56 @@ fn findNumber(result_total: *u64, prev_number: u64, goal_number: u64, current_va
     }
 }
 ```
+
+<details>
+<summary>naive organization display solution</summary>
+
+```zig
+    const std = @import("std");
+
+    pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+    const the_number = 20;
+    var all_lists = std.ArrayList(std.ArrayList(u32)).empty;
+    defer all_lists.deinit(allocator);
+
+        const initial_list = std.ArrayList(u32).empty;
+        try findNumber(allocator, &all_lists, initial_list, the_number, 0);
+
+        std.debug.print("{}\n", .{all_lists.items.len});
+
+        for (all_lists.items) |l| {
+            var list = l;
+            for (list.items) |i| {
+                std.debug.print("{},", .{i});
+            }
+            std.debug.print("\n", .{});
+            list.deinit(allocator);
+        }
+
+    }
+
+    fn findNumber(allocator: std.mem.Allocator, good_results: \*std.ArrayList(std.ArrayList(u32)), current_list: std.ArrayList(u32), goal_number: u32, current_value: u32) !void {
+    var list = current_list;
+    for (1..10) |\_i| {
+    const i = @as(u32, @intCast(\_i));
+    if (current_value == goal_number) {
+    try good_results.append(allocator, list);
+    return;
+    }
+    if (current_value > goal_number or (list.items.len > 0 and list.items[list.items.len - 1] == i)) {
+    continue;
+    }
+    var new_list = try std.ArrayList(u32).initCapacity(allocator, list.items.len + 1);
+    try new_list.insertSlice(allocator, 0, list.items);
+    try new_list.append(allocator, i);
+
+            try findNumber(allocator, good_results, new_list, goal_number, current_value + i);
+        }
+        list.deinit(allocator);
+
+    }
+
+```
+
+</details>
