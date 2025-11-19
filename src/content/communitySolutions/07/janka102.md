@@ -4,6 +4,8 @@ descriptions: ["ruby"]
 
 ## 2025
 
+One interesting thing I learned about Ruby is that the Hash class uses value equality for keys via `.hash` and `.eql?`. So for example two arrays with the same numbers in them can be used to check for the presense of the other (as apposed to only that _exact_ array). This was useful for me since I was using arrays for [x, y] coordinates and could then store those directly in the visits hash map.
+
 ```ruby
 require 'optparse'
 
