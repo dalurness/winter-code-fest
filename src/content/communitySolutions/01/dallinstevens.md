@@ -4,7 +4,7 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
-```Deno
+```ts
 class LetterCounter {
   private counts: Map<string, number>;
 
@@ -20,15 +20,18 @@ class LetterCounter {
     let bytesRead: number | null;
 
     while ((bytesRead = await file.read(buffer)) !== null) {
-      const chunk = leftover + new TextDecoder().decode(buffer.subarray(0, bytesRead));
+      const chunk =
+        leftover + new TextDecoder().decode(buffer.subarray(0, bytesRead));
       leftover = this.processChunk(chunk);
     }
   }
 
   public printCounts(): void {
-    const sortedCounts = Array.from(this.counts.entries()).sort(([aKey], [bKey]) => {
-      return aKey.localeCompare(bKey, undefined, { numeric: true });
-    });
+    const sortedCounts = Array.from(this.counts.entries()).sort(
+      ([aKey], [bKey]) => {
+        return aKey.localeCompare(bKey, undefined, { numeric: true });
+      }
+    );
 
     for (const [letter, count] of sortedCounts) {
       console.log(`${letter}: ${count}`);
@@ -43,7 +46,7 @@ class LetterCounter {
     }
     return leftover;
   }
-    
+
   private addToCount(letter: string): void {
     const currentCount = this.counts.get(letter) || 0;
     this.counts.set(letter, currentCount + 1);
@@ -51,7 +54,7 @@ class LetterCounter {
 }
 
 if (import.meta.main) {
-  const file = "letters_challenge.txt"
+  const file = "letters_challenge.txt";
 
   const myLetterCounter = new LetterCounter();
 
@@ -59,5 +62,4 @@ if (import.meta.main) {
 
   myLetterCounter.printCounts();
 }
-
 ```
