@@ -8,7 +8,7 @@ descriptions: ["deno"]
 if (import.meta.main) {
   const file = "large_message_encoded.txt"
   const text = await Deno.readTextFile(file);
-  
+
   let decodedMessage = "";
 
   for (let i = 0; i < text.length; i++) {
@@ -25,7 +25,7 @@ if (import.meta.main) {
         decodedMessage += String.fromCharCode(encodedNum + 97);
         i+=2;
       }
-      // check if character is uppercase 
+      // check if character is uppercase
       else if (encodedNum >= 26 && encodedNum <= 51) {
         decodedMessage += String.fromCharCode(encodedNum + 39);
         i+=2;
