@@ -4,9 +4,9 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
-```Deno
+```ts
 if (import.meta.main) {
-  const file = "large_message_encoded.txt"
+  const file = "large_message_encoded.txt";
   const text = await Deno.readTextFile(file);
 
   let decodedMessage = "";
@@ -23,19 +23,17 @@ if (import.meta.main) {
       // check if character is lowercase letter
       else if (encodedNum >= 0 && encodedNum <= 25) {
         decodedMessage += String.fromCharCode(encodedNum + 97);
-        i+=2;
+        i += 2;
       }
       // check if character is uppercase
       else if (encodedNum >= 26 && encodedNum <= 51) {
         decodedMessage += String.fromCharCode(encodedNum + 39);
-        i+=2;
+        i += 2;
       }
-    }
-    else {
+    } else {
       decodedMessage += text[i];
     }
   }
   console.log(decodedMessage);
 }
-
 ```
