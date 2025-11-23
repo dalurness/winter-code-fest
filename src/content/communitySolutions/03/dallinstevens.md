@@ -49,7 +49,7 @@ function fixCode(line: string): [boolean, string] { // Returns whether the endin
 }
 
 function validateCode(line: string): [boolean, number, number] { // Returns if the code is valid, number of valid adds and number of valid removes
-  const lineArray = line.split(''); 
+  const lineArray = line.split('');
   const lastChar = lineArray.pop();
   const secondToLastChar = lineArray.pop();
 
