@@ -11,7 +11,6 @@ interface Coordinates {
 }
 
 class Canvas {
-  
   private commands: string[];
   private grid: string[][];
   private currentPosition: Coordinates;
@@ -30,13 +29,14 @@ class Canvas {
       }
     }
     if (this.currentPosition.x > this.grid[this.currentPosition.y].length) {
-      const newRowsNeeded = this.currentPosition.x - this.grid[this.currentPosition.y].length;
+      const newRowsNeeded =
+        this.currentPosition.x - this.grid[this.currentPosition.y].length;
       for (let i = 0; i < newRowsNeeded; i++) {
         this.grid[this.currentPosition.y].push(" ");
       }
     }
   }
-  
+
   private moveX(amount: number) {
     this.currentPosition.x += amount;
     if (this.currentPosition.x < 0) {
@@ -64,8 +64,7 @@ class Canvas {
       }
       if (command == "LR") {
         this.currentPosition = { x: 0, y: 0 };
-      }
-      else {
+      } else {
         switch (command[0]) {
           case "U":
             this.moveY(-Number(command.slice(1)));
