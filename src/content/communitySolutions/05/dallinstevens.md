@@ -4,7 +4,7 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
-```Deno
+```ts
 interface Coordinates {
   x: number;
   y: number;
