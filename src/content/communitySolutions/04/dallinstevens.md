@@ -4,7 +4,9 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
-```Deno
+```ts
+const EPSILON = 1e-9;
+
 class Elf {
   effeciency: number;
   timeLeftOnPresent: number = 0;
@@ -14,9 +16,9 @@ class Elf {
     this.effeciency = effeciency;
   }
 
-  processPresent()  {
+  processPresent() {
     this.timeLeftOnPresent -= this.effeciency;
-    if (this.timeLeftOnPresent <= 0) {
+    if (this.timeLeftOnPresent <= EPSILON) {
       this.hasPresent = false;
     }
   }
@@ -36,7 +38,6 @@ if (import.meta.main) {
   let elvesStillWorking = true;
 
   while (presents.length > 0 || elvesStillWorking) {
-
     elvesStillWorking = false;
     for (const elf of elves) {
       if (!elf.hasPresent && presents.length !== 0) {
@@ -44,12 +45,14 @@ if (import.meta.main) {
         elf.assignPresent(Number(p));
         elvesStillWorking = true;
       }
-      else if (elf.hasPresent) {
+      if (elf.hasPresent) {
         elf.processPresent();
         elvesStillWorking = true;
       }
-    } 
-    time++;
+    }
+    if (elvesStillWorking) {
+      time++;
+    }
   }
   console.log(time);
 }
