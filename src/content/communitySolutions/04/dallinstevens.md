@@ -4,6 +4,12 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
+### Output
+
+```
+Total Time: 2803
+```
+
 ```ts
 const EPSILON = 1e-9;
 
