@@ -7,6 +7,7 @@ descriptions: ["zig"]
 ```zig
 const std = @import("std");
 
+const allocator = std.heap.page_allocator;
 pub fn main() !void {
     var filename_buf: [16]u8 = undefined;
     for (0..5) |i| {
@@ -17,8 +18,6 @@ pub fn main() !void {
     }
 }
 fn processFile(file: *std.fs.File) !void {
-    const allocator = std.heap.page_allocator;
-
     var buf: [1024 * 1024]u8 = undefined;
     var reader = file.reader(&buf);
 
@@ -61,5 +60,12 @@ fn processFile(file: *std.fs.File) !void {
         std.debug.print("{c}", .{c});
     }
     std.debug.print("\n\n\n\n======================\n\n\n\n", .{});
+
+    // cleanup
+    for (subs.items) |*list| {
+        list.deinit(allocator);
+    }
+    subs.deinit(allocator);
+    message.deinit(allocator);
 }
 ```
