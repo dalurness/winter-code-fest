@@ -32,7 +32,6 @@ class Day03
       checked = false
 
       code = code.rstrip
-			break if
       code.each_char.with_index do |c, i|
         case c
         when 'A'
