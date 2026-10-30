@@ -1,9 +1,15 @@
-import { MdOutlineDangerous, MdOutlineVerified } from "react-icons/md";
+import type { ReactNode } from "react";
+import {
+  MdOutlineDangerous,
+  MdOutlineLightbulb,
+  MdOutlineVerified,
+} from "react-icons/md";
 import { Dialog } from "./Dialog";
 import { Button } from "./Button";
 
 export enum ModalStatusType {
   Correct = "correct",
+  Close = "close",
   Incorrect = "incorrect",
   Closed = "closed",
 }
@@ -11,8 +17,9 @@ export enum ModalStatusType {
 type Props = {
   showModal: `${ModalStatusType}`;
   setShowModal: React.Dispatch<React.SetStateAction<ModalStatusType>>;
+  hint?: ReactNode;
 };
-export function RightWrongModal({ showModal, setShowModal }: Props) {
+export function RightWrongModal({ showModal, setShowModal, hint }: Props) {
   return (
     <Dialog
       open={showModal !== ModalStatusType.Closed}
@@ -23,6 +30,12 @@ export function RightWrongModal({ showModal, setShowModal }: Props) {
           <>
             <MdOutlineVerified size={48} className="text-teal-600 mb-4" />
             <span>You got it right!</span>
+          </>
+        ) : showModal === ModalStatusType.Close ? (
+          <>
+            <MdOutlineLightbulb size={48} className="text-yellow-600 mb-4" />
+            <span className="mb-2">That's close!</span>
+            <div className="text-center *:mb-2">{hint}</div>
           </>
         ) : (
           <>
