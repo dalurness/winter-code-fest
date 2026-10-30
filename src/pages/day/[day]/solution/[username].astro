@@ -1,5 +1,5 @@
 ---
-import { getCollection } from "astro:content";
+import { getCollection, render } from "astro:content";
 import LayoutNavbar from "../../../../layouts/LayoutNavbar.astro";
 import Question from "../../../../components/Question.astro";
 import { Link } from "../../../../components/Link";
@@ -8,13 +8,13 @@ export async function getStaticPaths() {
   const blogEntries = await getCollection("days");
   let entries = blogEntries.flatMap(async (dayEntry) => {
     const solutions = await getCollection("communitySolutions", ({ id }) => {
-      return id.startsWith(`${dayEntry.slug}/`);
+      return id.startsWith(`${dayEntry.id}/`);
     });
     return solutions.map((entry) => {
-      let username = entry.slug.split("/")[1]!;
+      let username = entry.id.split("/")[1]!;
 
       return {
-        params: { day: dayEntry.slug, username: username },
+        params: { day: dayEntry.id, username: username },
         props: { entry, dayEntry, username },
       };
     });
@@ -24,10 +24,10 @@ export async function getStaticPaths() {
 }
 
 const { entry, dayEntry, username } = Astro.props;
-const day = Number(dayEntry.slug);
+const day = Number(dayEntry.id);
 const { title } = dayEntry.data;
-const { Content: QuestionContent } = await dayEntry.render();
-const { Content } = await entry.render();
+const { Content: QuestionContent } = await render(dayEntry);
+const { Content } = await render(entry);
 ---
 
 <LayoutNavbar day={day} title={title}>

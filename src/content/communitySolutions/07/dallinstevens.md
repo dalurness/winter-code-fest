@@ -68,7 +68,7 @@ class Mapper {
       { path: "", coordinates: this.startingCoordinates },
     ]);
     let directions = "";
-    for (let i = 0; i < path.length; ) {
+    for (let i = 0; i < path.length;) {
       const curLetter = path[i];
       let letterCounter = 0;
       while (true) {
