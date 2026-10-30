@@ -12,8 +12,7 @@ export enum Size {
   large = "lg",
 }
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   color?: `${Color}`;
   size?: `${Size}`;
   pill?: boolean;
@@ -45,8 +44,7 @@ export function Button({
   );
 }
 
-export interface LinkButtonProps
-  extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+export interface LinkButtonProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
   color?: `${Color}`;
   size?: `${Size}`;
   pill?: boolean;

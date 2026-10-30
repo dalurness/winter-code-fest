@@ -6,9 +6,9 @@ import { MONTHS, dateToDay, festYear, yyyymmdd } from "../schedule";
 const days = await getCollection("days");
 
 const titles = days.reduce(
-  (titles, { slug, data }) => ({
+  (titles, { id, data }) => ({
     ...titles,
-    [Number(slug)]: data.title,
+    [Number(id)]: data.title,
   }),
   {} as Record<number, string>
 );

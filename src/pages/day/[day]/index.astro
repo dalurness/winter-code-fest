@@ -1,5 +1,5 @@
 ---
-import { getCollection } from "astro:content";
+import { getCollection, render } from "astro:content";
 import LayoutNavbar from "../../../layouts/LayoutNavbar.astro";
 import Question from "../../../components/Question.astro";
 import { DynamicSolution } from "../../../components/DynamicSolution";
@@ -9,7 +9,7 @@ import { Link } from "../../../components/Link";
 export async function getStaticPaths() {
   const blogEntries = await getCollection("days");
   return blogEntries.map((entry) => ({
-    params: { day: entry.slug },
+    params: { day: entry.id },
     props: { entry },
   }));
 }
@@ -17,18 +17,18 @@ export async function getStaticPaths() {
 const { entry } = Astro.props;
 
 const solutions = await getCollection("communitySolutions", ({ id }) => {
-  return id.startsWith(`${entry.slug}/`);
+  return id.startsWith(`${entry.id}/`);
 });
 const solutionList = solutions.map((s) => {
   return {
-    username: s.slug.split("/")[1]!,
+    username: s.id.split("/")[1]!,
     descriptions: s.data.descriptions,
   };
 });
-const { Content } = await entry.render();
+const { Content } = await render(entry);
 
-const day = Number(entry.slug);
-console.log(entry.slug, day);
+const day = Number(entry.id);
+console.log(entry.id, day);
 
 const { title } = entry.data;
 ---

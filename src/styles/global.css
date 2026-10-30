@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --color-yeti-light-1: #e5f0ff;
+  --color-yeti-light-3: #d0e3ff;
+  --color-yeti-light: #b9d1ff;
+  --color-yeti-light-5: #b9d1ff;
+  --color-yeti-light-7: #99bdff;
+  --color-yeti-light-9: #5d7dba;
+
+  --color-yeti-dark-1: #5c5c5c;
+  --color-yeti-dark-3: #474747;
+  --color-yeti-dark: #333333;
+  --color-yeti-dark-5: #333333;
+  --color-yeti-dark-7: #1f1f1f;
+  --color-yeti-dark-9: #0a0a0a;
+
+  --font-poppins: "Poppins", var(--font-sans);
+}
+
+@utility bg-strike-out {
+  background-image: linear-gradient(
+    to top left,
+    transparent calc(50% - 1px),
+    var(--color-yeti-dark-7),
+    transparent calc(50% + 1px)
+  );
+}

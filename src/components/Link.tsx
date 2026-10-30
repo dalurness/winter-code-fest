@@ -1,8 +1,7 @@
 const { BASE_URL } = import.meta.env;
 const HAS_EXTENSION = /\.[0-9a-z]+$/i;
 
-export interface LinkProps
-  extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+export interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
   href: string;
 }
 export function Link({ href, children, ...nativeProps }: LinkProps) {
