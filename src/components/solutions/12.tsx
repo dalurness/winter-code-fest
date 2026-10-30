@@ -15,7 +15,7 @@ export default function () {
           ],
           [
             "input3.txt",
-            "a0dee83d3fb3b0d91facbd667f27f6910e74e5bc1d6d0de321e63d81dd44aa7c",
+            "2bada90cc146b4cb1a8bd5c706dfa23cf90bb591bb6b872933325250efbdb3c2",
           ],
           [
             "input4.txt",
