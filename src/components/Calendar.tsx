@@ -124,7 +124,7 @@ export function Calendar({ current, className }: CalendarProps) {
                     {date.getDate()}
                   </time>
                   <div className="text-sm mt-2 hidden md:block w-full">
-                    Day {day}: {titles[day]}
+                    #{day}: {titles[day]}
                   </div>
                 </Link>
               );
