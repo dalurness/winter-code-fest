@@ -2,6 +2,7 @@ import { MdWarning } from "react-icons/md";
 import { Dialog } from "./Dialog";
 import { Button } from "./Button";
 import { useEffect, useState } from "react";
+import { dayToDate } from "../schedule";
 
 type Props = {
   day: number;
@@ -16,12 +17,9 @@ export function DayAheadDialog({ day }: Props) {
   const [reallyClose, setReallyClose] = useState(false);
 
   useEffect(() => {
-    const now = new Date();
-
-    // note: month is zero indexed
     // Always allow day 1 to be visible, but
-    // block other days in december before they happen IRL.
-    if (day > 1 && (now.getMonth() < 11 || now.getDate() < day)) {
+    // block other days before they happen IRL.
+    if (day > 1 && new Date() < dayToDate(day)) {
       setShowModal(true);
     }
   }, []);
