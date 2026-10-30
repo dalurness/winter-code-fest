@@ -54,7 +54,7 @@ Any static assets, like images, can be placed in the `public/` directory.
 
 ### WCF Logical Organization
 
-WCF is made up of one question per day for the month of December. You can find the page structure for a question in `/src/pages/day/[day]/index.astro`.
+WCF is made up of one question every other day from November 1st through December 31st (see `/src/schedule.ts`). You can find the page structure for a question in `/src/pages/day/[day]/index.astro`.
 
 There are some dynamic parts to the page that you can read the Astro documentation on, but long story short the questions' text are in `/src/content/days`, the community solutions are in `/src/content/communitySolutions`, the dynamic components that verify answers are in `/src/components/solutions`, and the static resource files for the questions are in `/public/day`.
 
