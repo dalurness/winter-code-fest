@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "winter-code-fest-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4322"],
+      "port": 4322
+    },
+    {
+      "name": "winter-code-fest-astro-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "4323"],
+      "port": 4323
+    }
+  ]
+}
