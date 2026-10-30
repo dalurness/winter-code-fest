@@ -2,23 +2,13 @@
 title: "Santa Says Cheese"
 ---
 
+import { BayerDiagram } from "../../components/BayerDiagram";
+
 The elves bought a fancy new camera, the _Snowflake 3000_, to take Santa's official Christmas card photo. There's just one problem: the software that turns the camera's readings into a real picture is broken. All the elves have is the **raw sensor data**, a big grid of numbers, and no idea what the photo looks like.
 
-A camera sensor is a grid of tiny light buckets. Each bucket sits under a red, green, or blue filter, so it only measures how much of _one_ color reached it. The colors come in a repeating 2×2 block (called a Bayer pattern):
+A camera sensor is a grid of tiny light buckets. Each bucket sits under a red, green, or blue filter, so it only measures how much of _one_ color reached it. The colors come in a repeating 2×2 block (called a Bayer pattern), which tiles across the whole sensor:
 
-```
-R G
-G B
-```
-
-That block tiles across the whole sensor:
-
-```
-R G R G
-G B G B
-R G R G
-G B G B
-```
+<BayerDiagram client:load />
 
 Your job is to "develop" the photo by turning each 2×2 block of buckets into one full-color pixel. You don't need to know anything about photography to do this, just follow the steps.
 
@@ -63,8 +53,14 @@ becomes `944 1844 / 1804 1244` after step 1, then red = 944, green = (1844 + 180
 (Don't worry if some of your values are off by one because of rounding, that's fine.)
 
 <details>
-<summary>Hint: How do I see my image?</summary>
-The simplest way to save an image is the PPM text format. Write <code>P3</code> on the first line, then the width and height on the second line, then <code>255</code> on the third line. After that write the red, green, and blue numbers of each pixel, one pixel after another, in order from the top left. Many image programs (GIMP, ImageMagick, or an online PPM viewer) can open it. A 160×96 image is tiny, so zoom in. Or, use any image library in your language to save a PNG.
+  <summary>Hint: How do I see my image?</summary>
+  The simplest way to save an image is the PPM text format. Write{" "}
+  <code>P3</code> on the first line, then the width and height on the second
+  line, then <code>255</code> on the third line. After that write the red,
+  green, and blue numbers of each pixel, one pixel after another, in order from
+  the top left. Many image programs (GIMP, ImageMagick, or an online PPM viewer)
+  can open it. A 160×96 image is tiny, so zoom in. Or, use any image library in
+  your language to save a PNG.
 </details>
 
 **Challenge**: Your picture is only half the size of the sensor because every 2×2 block was squashed into one pixel. Real cameras don't throw that detail away. Try making a full-size 320×192 image instead, where every sensor spot gets its own pixel. Each spot only knows one color, so estimate the two missing colors by averaging the nearest neighbors that did measure them (this is called demosaicing). Compare it with your first picture. Are the edges of the snowman sharper? There's no answer box for this one, so show off your results in your solution!
