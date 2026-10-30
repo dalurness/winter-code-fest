@@ -29,7 +29,19 @@ export function RightWrongModal({ showModal, setShowModal, hint }: Props) {
         {showModal === ModalStatusType.Correct ? (
           <>
             <MdOutlineVerified size={48} className="text-teal-600 mb-4" />
-            <span>You got it right!</span>
+            <span className="mb-2">You got it right!</span>
+            <span className="text-center">
+              Share your solution with the community!{" "}
+              <a
+                href="https://github.com/dalurness/winter-code-fest#once-you-have-finished-a-question"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-teal-600"
+              >
+                Submit a PR
+              </a>{" "}
+              to add it to the repo.
+            </span>
           </>
         ) : showModal === ModalStatusType.Close ? (
           <>
