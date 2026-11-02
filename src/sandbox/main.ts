@@ -1395,7 +1395,8 @@ sash($("sash-panel"), (event) => {
 // --- Run -----------------------------------------------------------------
 
 /** Files `sb run` knows how to run, besides anything in a starter project */
-const RUNNABLE = /\.(ts|js|mjs|rb|py|go|rs|c|s|S|zig|exs|ex|sh|gleam|clk)$/;
+const RUNNABLE =
+  /\.(ts|js|mjs|rb|py|go|rs|c|s|S|zig|exs|ex|sh|gleam|clk|cpp|cc|cxx|erl|lua|php|pl)$/;
 const STARTER = /^\/workspace\/(?!days\/)[^/]+\//;
 let running = false;
 /** Set once the first shell prompt is up */

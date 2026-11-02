@@ -76,6 +76,7 @@ run_file() {
     *.go) built || go build -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.rs) built || rustc -O -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.c) built || cc -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.cpp | *.cc | *.cxx) built || g++ -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.s | *.S) built || cc -no-pie -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.zig)
       # Same CPU as the template, so the image's warm cache applies
@@ -85,6 +86,10 @@ run_file() {
       exec "$bin"
       ;;
     *.exs | *.ex) mark start; exec elixir "$file" ;;
+    *.erl) mark start; exec escript "$file" ;;
+    *.lua) mark start; exec lua "$file" ;;
+    *.php) mark start; exec php "$file" ;;
+    *.pl) mark start; exec perl "$file" ;;
     *.sh) mark start; exec bash "$file" ;;
     *.clk) mark start; exec clank run "$file" ;;
     *.gleam)

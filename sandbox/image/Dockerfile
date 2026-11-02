@@ -17,7 +17,9 @@ RUN --mount=type=cache,target=/etc/apk/cache apk add \
       build-base \
       rust cargo \
       elixir gleam \
-      tmux bash sqlite zstd
+      lua5.4 php85 perl \
+      tmux bash sqlite zstd \
+ && ln -s lua5.4 /usr/bin/lua && ln -s luac5.4 /usr/bin/luac
 
 # Zig is not packaged for x86 in Alpine; use the official static build
 ARG ZIG_VERSION=0.15.2
