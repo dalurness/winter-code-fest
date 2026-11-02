@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ### 2025 Solution Zig
 
+<details>
+<summary>Show Zig Solution</summary>
+
 ```zig
 const std = @import("std");
 
@@ -97,3 +100,5 @@ fn processFile(write_file: *std.fs.File, file: *std.fs.File, filebuf: []u8) !voi
     }
 }
 ```
+
+</details>

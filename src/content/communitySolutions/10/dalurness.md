@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ## 2025
 
+<details>
+<summary>Show Zig Solution</summary>
+
 #### Output
 
 ```
@@ -103,3 +106,5 @@ fn insert(allocator: *const std.mem.Allocator, list: *std.ArrayList(u32), new_nu
     list.items[new_num] = new_num;
 }
 ```
+
+</details>

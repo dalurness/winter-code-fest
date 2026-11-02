@@ -4,6 +4,9 @@ descriptions: ["zig", "gleam"]
 
 ### 2025 Solution Zig
 
+<details>
+<summary>Show Zig Solution</summary>
+
 ### Output
 
 ```
@@ -53,7 +56,12 @@ pub fn main() !void {
 }
 ```
 
+</details>
+
 ### 2024 Solution Gleam
+
+<details>
+<summary>Show Gleam Solution</summary>
 
 #### Output
 
@@ -161,3 +169,5 @@ pub fn main() {
   )
 }
 ```
+
+</details>

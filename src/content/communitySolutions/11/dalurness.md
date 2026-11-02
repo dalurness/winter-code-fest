@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ## 2025
 
+<details>
+<summary>Show Zig Solution</summary>
+
 #### Output
 
 ```
@@ -81,3 +84,5 @@ fn digitsOfInt(num: u256, allocator: std.mem.Allocator) ![]u8 {
 }
 
 ```
+
+</details>

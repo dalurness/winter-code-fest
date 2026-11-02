@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ## 2025
 
+<details>
+<summary>Show Zig Solution</summary>
+
 #### Output
 
 ```
@@ -234,3 +237,5 @@ pub fn main() !void {
     }
 }
 ```
+
+</details>

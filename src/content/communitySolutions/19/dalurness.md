@@ -4,6 +4,9 @@ descriptions: ["gleam"]
 
 ### 2024 Solution Gleam
 
+<details>
+<summary>Show Gleam Solution</summary>
+
 ```gleam
 import gleam/int
 import gleam/io
@@ -154,3 +157,5 @@ Naomi: NICE
 Andrew: NAUGHTY
 Madison: NICE
 ```
+
+</details>
