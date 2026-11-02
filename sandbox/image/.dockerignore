@@ -1,0 +1,2 @@
+# The rootfs tar and downloaded tools are huge and not needed in the build
+.cache/

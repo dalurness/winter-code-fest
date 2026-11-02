@@ -1,0 +1,872 @@
+/* Arial sized like Poppins, so text does not move when Poppins loads */
+@font-face {
+  font-family: "Poppins Fallback";
+  src: local("Arial"), local("Liberation Sans"), local("Helvetica");
+  ascent-override: 92.33%;
+  descent-override: 30.78%;
+  line-gap-override: 8.79%;
+  size-adjust: 113.73%;
+}
+
+/* Winter Day uses the main site's colors (src/styles/global.css); Winter
+   Night is near black and tinted blue. main.ts sets data-theme, following the
+   system's preference unless one is picked. */
+:root {
+  --bg: #f6f9ff;
+  --chrome: #e5f0ff;
+  --border: #b9d1ff;
+  --text: #333333;
+  --strong: #1f1f1f;
+  --muted: #5c5c5c;
+  --hover: #d0e3ff;
+  --selected: #b9d1ff;
+  --accent: #5d7dba;
+  --accent-hover: #4c6aa3;
+  --input: #ffffff;
+  --input-border: #99bdff;
+  --overlay: #ffffff;
+  --link: #3a4fa0;
+  --code-bg: #d0e3ff;
+  --hover-icon: #5d7dba26;
+  --ui-font: "Poppins", "Poppins Fallback", system-ui, sans-serif;
+  --sidebar-width: 240px;
+  --panel-height: 38%;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d121b;
+  --chrome: #090d14;
+  --border: #1c2636;
+  --text: #c4cfdf;
+  --strong: #eef3fb;
+  --muted: #7c8aa2;
+  --hover: #162031;
+  --selected: #1e2c44;
+  --accent: #4d6ba8;
+  --accent-hover: #5b7bbb;
+  --input: #121a27;
+  --input-border: #25344c;
+  --overlay: #0f1622;
+  --link: #8fb3ff;
+  --code-bg: #162031;
+  --hover-icon: #a9c4ff1c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px var(--ui-font);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+button:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button.icon {
+  background: none;
+  border-color: transparent;
+  padding: 0 5px;
+  line-height: 20px;
+  color: var(--text);
+}
+
+button.icon:hover:not(:disabled),
+button.icon.on {
+  background: var(--hover-icon);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* --- Title bar --- */
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 35px;
+  padding: 0 10px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.brand img {
+  width: 22px;
+}
+
+.brand:hover {
+  color: var(--text);
+}
+
+.crumb {
+  color: var(--muted);
+}
+
+.titlebar strong {
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+/* --- Workbench --- */
+
+.workbench {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 0 1fr;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--chrome);
+  border-right: 1px solid var(--border);
+}
+
+.pane-title {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  padding: 0 8px 0 20px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.pane-title .actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+.main {
+  display: grid;
+  grid-template-rows: auto auto 1fr 0 var(--panel-height);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Drag handles, drawn as a line on hover like VS Code's sashes */
+.sash {
+  position: relative;
+  z-index: 5;
+}
+
+.sash::after {
+  content: "";
+  position: absolute;
+  transition: background 0.1s 0.2s;
+}
+
+.sash.vertical::after {
+  inset: 0 -3px;
+  cursor: ew-resize;
+}
+
+.sash.horizontal::after {
+  inset: -3px 0;
+  cursor: ns-resize;
+}
+
+.sash:hover::after,
+.sash.dragging::after {
+  background: var(--accent);
+}
+
+.sash.vertical:hover::after,
+.sash.vertical.dragging::after {
+  inset: 0 -2px;
+}
+
+.sash.horizontal:hover::after,
+.sash.horizontal.dragging::after {
+  inset: -2px 0;
+}
+
+/* --- Explorer --- */
+
+.tree {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+.tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree .row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding-right: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.tree .row:hover {
+  background: var(--hover);
+}
+
+.tree .row.active {
+  background: var(--selected);
+}
+
+.tree .row:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tree .twistie {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.tree .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree .link .name {
+  font-style: italic;
+}
+
+.tree .target {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree .dirty .name::after {
+  content: " ●";
+  color: var(--muted);
+}
+
+/* Indent guides */
+.tree li > ul {
+  background-image: linear-gradient(var(--muted), var(--muted));
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position-x: var(--guide);
+}
+
+.tree:not(:hover) li > ul {
+  background-image: none;
+}
+
+.section-root > .row {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* File type badges in the explorer and tabs */
+.badge {
+  flex: none;
+  width: 16px;
+  font:
+    700 9px/1 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  text-align: center;
+  color: var(--badge, var(--muted));
+}
+
+/* --- Tabs --- */
+
+.tabs-bar {
+  display: flex;
+  align-items: stretch;
+  height: 35px;
+  background: var(--chrome);
+  /* An inset line instead of a border, so the active tab can paint over it
+     without overflowing the bar */
+  box-shadow: inset 0 -1px var(--border);
+}
+
+.tabs {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.tabs-bar > .icon {
+  margin: 6px 2px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 10px;
+  border-right: 1px solid var(--border);
+  border-top: 1px solid transparent;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab.dragging {
+  opacity: 0.5;
+}
+
+/* Where a dragged tab will land */
+.tab.drop-before {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.tab.drop-after {
+  box-shadow: inset -2px 0 var(--accent);
+}
+
+.tab.active {
+  background: var(--bg);
+  color: var(--strong);
+  border-top-color: var(--accent);
+}
+
+.tab .description {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.tab .close {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  border-radius: 4px;
+  visibility: hidden;
+}
+
+.tab:hover .close,
+.tab.active .close,
+.tab.dirty .close {
+  visibility: visible;
+}
+
+.tab .close:hover {
+  background: var(--hover-icon);
+}
+
+.tab.dirty .close::before {
+  content: "●";
+}
+
+.tab.dirty .close:hover::before {
+  content: "×";
+}
+
+.tab:not(.dirty) .close::before {
+  content: "×";
+}
+
+.breadcrumbs {
+  height: 22px;
+  padding: 0 14px;
+  line-height: 22px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Where dropped files will go */
+.tree.drop-target {
+  outline: 1px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.tree .row.drop-target {
+  background: var(--selected);
+}
+
+.editor-area.drop-target::after {
+  content: "Drop to add to this folder and open";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  outline: 1px dashed var(--accent);
+  outline-offset: -2px;
+  color: var(--strong);
+  pointer-events: none;
+}
+
+.tree-loading {
+  margin: 0;
+  padding: 4px 20px;
+  color: var(--muted);
+}
+
+.breadcrumbs.address-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 0 8px;
+}
+
+.address-bar input {
+  flex: 1;
+  min-width: 0;
+  margin-left: 4px;
+  padding: 1px 10px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.breadcrumbs .sep {
+  margin: 0 4px;
+  opacity: 0.6;
+}
+
+/* --- Editor area --- */
+
+.editor-area {
+  position: relative;
+  min-height: 0;
+}
+
+.editor,
+.preview,
+.empty {
+  position: absolute;
+  inset: 0;
+}
+
+.page-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #e5f0ff;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+}
+
+.preview {
+  overflow: auto;
+  padding: 24px 32px;
+  line-height: 1.6;
+  font-size: 15px;
+  font-family: var(--ui-font);
+}
+
+.preview > * {
+  max-width: 80ch;
+}
+
+.preview > * + * {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.preview h1 {
+  font-size: 1.9em;
+  line-height: 1.25;
+  margin: 0 0 1.2rem;
+}
+
+.preview h2 {
+  font-size: 1.4em;
+  margin-top: 2rem;
+}
+
+.preview a {
+  color: var(--link);
+}
+
+.preview code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.preview pre {
+  background: var(--code-bg);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.preview pre code {
+  padding: 0;
+}
+
+.preview table {
+  border-collapse: collapse;
+}
+
+.preview th,
+.preview td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+/* --- Terminal panel --- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+
+.panel .pane-title {
+  padding-left: 14px;
+}
+
+.terminals {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.term {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0 4px 14px;
+}
+
+.term + .term {
+  border-left: 1px solid var(--border);
+}
+
+.term,
+.term .xterm-viewport {
+  background: var(--bg) !important;
+}
+
+.workbench.sidebar-hidden {
+  grid-template-columns: 0 0 1fr;
+}
+
+.workbench.sidebar-hidden .sidebar {
+  display: none;
+}
+
+.main.panel-hidden {
+  grid-template-rows: auto auto 1fr 0 0;
+}
+
+.main.panel-hidden .panel,
+.main.panel-hidden .sash.horizontal {
+  display: none;
+}
+
+/* --- Settings, quick open and menus --- */
+
+/* Laid out like VS Code's settings editor */
+.settings-page {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 16px 32px 48px;
+}
+
+.settings-page > * {
+  max-width: 720px;
+}
+
+.settings-page h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--strong);
+}
+
+.settings-page h2 {
+  margin: 24px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--strong);
+}
+
+.setting {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  padding: 10px 12px;
+  margin: 0 -12px;
+  border-radius: 4px;
+}
+
+.setting:hover {
+  background: var(--hover-icon);
+}
+
+.setting span {
+  color: var(--muted);
+}
+
+.setting.checkbox span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.setting input[type="checkbox"] {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.setting select {
+  min-width: 200px;
+}
+
+.setting input[type="number"] {
+  width: 80px;
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 24px;
+  margin: 8px 0 0;
+  white-space: nowrap;
+}
+
+.shortcuts dt {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.shortcuts dd {
+  margin: 0;
+}
+
+.quick-open {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  z-index: 20;
+  width: min(600px, calc(100% - 32px));
+  transform: translateX(-50%);
+  padding: 6px;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+
+.quick-open input {
+  width: 100%;
+  padding: 4px 8px;
+}
+
+.quick-open ul,
+.context-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quick-open li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.quick-open li .dir {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-open li.selected {
+  background: var(--selected);
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 180px;
+  padding: 4px;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px #0004;
+}
+
+.context-menu li[role="menuitem"] {
+  padding: 3px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.context-menu li[role="menuitem"]:hover,
+.context-menu li[role="menuitem"]:focus {
+  background: var(--accent);
+  color: #fff;
+  outline: none;
+}
+
+.context-menu li[role="separator"] {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+/* --- Status bar --- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar > * {
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.statusbar button {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.statusbar button:hover {
+  background: var(--hover-icon);
+}
+
+.statusbar a {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.statusbar a:hover {
+  background: var(--hover-icon);
+}
+
+#status {
+  height: 100%;
+  line-height: 22px;
+  background: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .workbench {
+    grid-template-columns: 0 0 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .titlebar .crumb,
+  .footer-info {
+    display: none;
+  }
+
+  /* Just the logo */
+  .brand {
+    font-size: 0;
+  }
+}

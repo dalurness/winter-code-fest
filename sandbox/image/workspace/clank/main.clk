@@ -1,0 +1,12 @@
+# Run with the Run button, or `./run.sh [NAME]` in the terminal.
+# SPEC.md next to this file describes the whole language.
+
+greeting : (i: Int, name: Str) -> <> Str =
+  "${i}: Hello, ${name}!"
+
+main : () -> <io> () =
+  let name = match cli.args() {
+    [first, ..] => first
+    [] => "Winter Code Fest"
+  }
+  for i in range(1, 3) do print(greeting(i, name))

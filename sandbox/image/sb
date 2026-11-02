@@ -1,0 +1,186 @@
+#!/bin/sh
+# Helper the web UI types into the terminal.
+#
+#   sb sync  [EPOCH ROWS COLS]          apply saved files, set the clock and terminal size
+#   sb run   [EPOCH ROWS COLS [FILE]]   same, then run FILE (or ./run.sh) and time it
+#   sb bench EPOCH ROWS COLS FILE [N]   same, then run it N more times with no output
+#   sb exec  PROGRAM [ARGS]             mark where measuring starts, then run PROGRAM
+#
+# SB_CALIBRATE=1 makes run measure background work first, as bench always does.
+#
+# The root is mounted with cache=loose, so the guest does not see files the
+# editor writes from JS. The editor also stages each save in /.sb, and copying
+# it over the target from in here updates the guest's cache.
+#
+# The clock matters because cargo and the C template compare mtimes. After
+# restoring a snapshot the guest clock is wherever it was when the snapshot
+# was taken.
+#
+# The page counts the guest's instructions between the markers below. They are
+# escape sequences that xterm ignores, and the page reads v86's counter the
+# moment the serial port sends them. A project's run.sh builds first and then
+# runs the program with `sb exec`, so only the program is counted. Every way of
+# running something marks its start and then execs it, so the empty baseline
+# below costs the same overhead. Markers go to the terminal itself, so they
+# still arrive when output is redirected.
+mark() { printf '\033]7771;%s\007' "$1" 2>/dev/null > /dev/tty; }
+
+if [ "$1" = exec ]; then
+  shift
+  mark start
+  exec "$@"
+fi
+
+cmd=$1
+[ -n "$2" ] && date -s "@$2" >/dev/null
+[ -n "$4" ] && stty rows "$3" cols "$4"
+file=$5
+runs=${6:-3}
+
+for staged in /.sb/*.path; do
+  [ -e "$staged" ] || continue
+  target=$(cat "$staged")
+  mkdir -p "${target%/*}"
+  cat "${staged%.path}.data" > "$target"
+  rm -f "${staged%.path}.data" "$staged"
+done
+
+# Runs a file: with its project's run.sh if it is in one (the templates under
+# /workspace), otherwise with the toolchain for its extension. Community
+# solutions run from their day's folder, next to the input files; anything
+# else from its own folder.
+run_file() {
+  file=$1
+  dir=$(dirname "$file")
+  project=$dir
+  while [ "$project" != / ] && [ "$project" != /workspace ]; do
+    if [ -x "$project/run.sh" ]; then
+      cd "$project" && ./run.sh
+      return
+    fi
+    project=$(dirname "$project")
+  done
+
+  case "$dir" in
+    /workspace/days/*/solutions/*) cd "${dir%/solutions/*}" ;;
+    *) cd "$dir" ;;
+  esac || return
+  # Compiled files build once per version of the file. rustc and zig take a
+  # minute or more under emulation even when nothing changed.
+  bin=/tmp/sb-bin/$(printf %s "$file" | cksum | cut -d' ' -f1)
+  mkdir -p /tmp/sb-bin
+  case "$file" in
+    *.ts | *.js | *.mjs) mark start; exec node "$file" ;;
+    *.rb) mark start; exec ruby "$file" ;;
+    *.go) built || go build -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.rs) built || rustc -O -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.c) built || cc -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.s | *.S) built || cc -no-pie -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.zig)
+      # Same CPU as the template, so the image's warm cache applies
+      built || zig build-exe -mcpu=baseline --cache-dir /tmp/zig-cache -femit-bin="$bin" "$file" ||
+        return
+      mark start
+      exec "$bin"
+      ;;
+    *.exs | *.ex) mark start; exec elixir "$file" ;;
+    *.sh) mark start; exec bash "$file" ;;
+    *.clk) mark start; exec clank run "$file" ;;
+    *.gleam)
+      # Gleam needs a project; reuse the template's, with its build cache.
+      # Input files from this folder are linked in, for relative paths.
+      rm -rf /tmp/sb-gleam && cp -r /workspace/gleam /tmp/sb-gleam &&
+        cp "$file" /tmp/sb-gleam/src/sandbox.gleam || return
+      for input in "$PWD"/*; do
+        if [ -f "$input" ]; then ln -sf "$input" /tmp/sb-gleam/; fi
+      done
+      cd /tmp/sb-gleam && ./run.sh
+      ;;
+    *) echo "sb: no way to run $(basename "$file")" >&2; return 2 ;;
+  esac
+}
+
+built() { [ "$bin" -nt "$file" ]; }
+
+# busybox date has no %N, so time with /proc/uptime (centiseconds)
+uptime_cs() { cut -d' ' -f1 /proc/uptime | tr -d .; }
+
+# Runs once, marked, and sets $status and $cs
+run_once() {
+  start=$(uptime_cs)
+  mark start
+  if [ -n "$file" ]; then (run_file "$file"); else ./run.sh; fi
+  status=$?
+  mark end
+  cs=$(($(uptime_cs) - start))
+}
+
+# Runs sb-spin0 and sb-spin, which differ by a known number of instructions.
+# The rest of the difference is background work, like timer interrupts, which
+# the page subtracts per real second from every run.
+calibrate() {
+  mark "calibrate $(cat /usr/local/share/sb-spin-instructions)"
+  for program in sb-spin0 sb-spin; do
+    mark start
+    sb exec "$program"
+    mark end
+  done
+  mark measure
+}
+
+# Runs sb-empty, a program that only exits, the way run.sh files run theirs.
+# The page subtracts its count: the cost of starting and ending any process.
+baseline() {
+  mark baseline
+  for i in 1 2 3 4 5; do
+    mark start
+    sb exec sb-empty
+    mark end
+  done
+  mark measure
+}
+
+# The page puts the instruction count where `mark report` is
+summary() {
+  printf '\n\033[2m[%s in %d.%02ds' "$1" $((cs / 100)) $((cs % 100))
+  mark report
+  printf ']\033[0m\n'
+}
+
+case "$cmd" in
+  sync) ;;
+  run)
+    clear
+    mark reset
+    if [ -n "$SB_CALIBRATE" ]; then calibrate; fi
+    baseline
+    run_once
+    # Guest writes are cached; flush them so the editor's Refresh sees them
+    sync
+    summary "exit $status"
+    ;;
+  bench)
+    clear
+    # The first run builds and warms caches, and shows the output
+    mark reset
+    run_once
+    if [ "$status" = 0 ]; then
+      mark reset
+      calibrate
+      baseline
+      total=0
+      i=0
+      while [ "$i" -lt "$runs" ] && [ "$status" = 0 ]; do
+        i=$((i + 1))
+        printf '\033[2mBenchmark run %d of %d…\033[0m\r' "$i" "$runs"
+        run_once > /dev/null 2>&1
+        total=$((total + cs))
+      done
+      printf '\033[K'
+      cs=$((total / i))
+    fi
+    sync
+    if [ "$status" = 0 ]; then summary "$runs runs, average"; else summary "exit $status"; fi
+    ;;
+  *) echo "usage: sb sync|run|bench [EPOCH ROWS COLS [FILE [N]]]" >&2; exit 2 ;;
+esac

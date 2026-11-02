@@ -1,0 +1,287 @@
+---
+import { FaGithub } from "react-icons/fa";
+// Here rather than in main.ts, so the layout is styled from the first paint
+import "@xterm/xterm/css/xterm.css";
+import "../../sandbox/style.css";
+
+const { BASE_URL } = import.meta.env;
+
+/** Shown in the settings menu; main.ts handles the keys */
+const SHORTCUTS = [
+  ["Ctrl+Enter, F5", "Run the open file"],
+  ["Ctrl+Shift+Enter", "Benchmark the open file"],
+  ["Ctrl+S", "Save"],
+  ["Ctrl+P", "Go to file"],
+  ["Ctrl+`, Ctrl+J", "Show or hide the terminal"],
+  ["Ctrl+Shift+`", "Open a second terminal"],
+  ["Ctrl+Shift+↑ / ↓", "Resize the terminal"],
+  ["Ctrl+B", "Show or hide the explorer"],
+  ["Ctrl+Shift+E", "Focus the explorer"],
+  ["Ctrl+Shift+V", "Toggle Markdown preview"],
+  ["Alt+W, Ctrl+F4", "Close the tab"],
+  ["Alt+1…9", "Go to tab"],
+  ["Ctrl+,", "Settings"],
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Run Winter Code Fest solutions in a Linux VM in your browser"
+    />
+    <title>Sandbox | Winter Code Fest</title>
+    <script is:inline>
+      // Sets the theme before the first paint, which main.ts is too late for.
+      // Mirrors resolveTheme in src/sandbox/settings.ts.
+      {
+        let theme = "system";
+        try {
+          theme =
+            JSON.parse(localStorage.getItem("wcf-sandbox-settings") ?? "{}")
+              .theme ?? theme;
+        } catch {}
+        if (theme === "system")
+          theme = matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "wcf";
+        document.documentElement.dataset.theme = theme;
+      }
+    </script>
+    <link
+      rel="shortcut icon"
+      href={BASE_URL + "favicon.ico"}
+      type="image/x-icon"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="titlebar">
+      <a class="brand" href={BASE_URL}
+        ><img src={BASE_URL + "logo.svg"} alt="" />Winter Code Fest</a
+      >
+      <span class="crumb">/</span>
+      <strong>Sandbox</strong>
+      <button
+        id="run"
+        class="primary"
+        disabled
+        title="Save all and run the open file (Ctrl+Enter)"
+      >
+        ▶ Run
+      </button>
+      <button
+        id="bench"
+        disabled
+        title="Run several times and count the VM's instructions (Ctrl+Shift+Enter)"
+      >
+        ⏱ Benchmark
+      </button>
+      <span class="spacer"></span>
+      <button id="reset" disabled title="Restore the VM snapshot">
+        Reset VM
+      </button>
+      <button id="settings-button" class="icon" title="Settings (Ctrl+,)">⚙</button>
+    </header>
+
+    <main id="workbench" class="workbench">
+      <aside class="sidebar">
+        <div class="pane-title">
+          Explorer
+          <span class="actions">
+            <button
+              id="refresh"
+              class="icon"
+              disabled
+              title="Reload files from the VM">⟳</button
+            >
+            <button
+              id="upload"
+              class="icon"
+              disabled
+              title="Upload files to the selected folder, or drop files on the explorer"
+              >⤒</button
+            >
+            <input id="upload-input" type="file" multiple hidden />
+            <button id="collapse" class="icon" title="Collapse folders"
+              >⊟</button
+            >
+          </span>
+        </div>
+        <nav id="tree" class="tree" aria-label="Files">
+          <p class="tree-loading">Loading files…</p>
+        </nav>
+      </aside>
+      <div id="sash-sidebar" class="sash vertical" role="separator"></div>
+
+      <section id="main" class="main">
+        <div class="tabs-bar">
+          <div id="tabs" class="tabs" role="tablist"></div>
+          <button
+            id="open-site"
+            class="icon"
+            title="Open the Winter Code Fest site in a new tab">⌂</button
+          >
+          <button
+            id="preview-toggle"
+            class="icon"
+            disabled
+            title="Toggle Markdown preview (Ctrl+Shift+V)">◫</button
+          >
+        </div>
+        <div id="breadcrumbs" class="breadcrumbs"></div>
+        <div class="editor-area">
+          <section id="editor" class="editor"></section>
+          <article id="preview" class="preview" hidden></article>
+          <div id="pages"></div>
+          <form id="settings" class="settings-page" hidden>
+            <h1>Settings</h1>
+            <h2>Appearance</h2>
+            <label class="setting">
+              <strong>Theme</strong>
+              <span
+                >Colors for the editor, terminal and preview. System follows
+                your device's light or dark setting.</span
+              >
+              <select name="theme">
+                <option value="system">System</option>
+                <option value="wcf">Winter Day</option>
+                <option value="dark">Winter Night</option>
+              </select>
+            </label>
+            <label class="setting">
+              <strong>Font Size</strong>
+              <span>The editor's font size, in pixels.</span>
+              <input type="number" name="fontSize" min="8" max="32" />
+            </label>
+            <label class="setting checkbox">
+              <strong>Render Whitespace</strong>
+              <span
+                ><input type="checkbox" name="renderWhitespace" /> Show spaces and
+                tabs everywhere, not just in the selection.</span
+              >
+            </label>
+            <label class="setting checkbox">
+              <strong>Word Wrap</strong>
+              <span
+                ><input type="checkbox" name="wordWrap" /> Wrap long lines to the
+                editor's width.</span
+              >
+            </label>
+            <label class="setting checkbox">
+              <strong>Minimap</strong>
+              <span
+                ><input type="checkbox" name="minimap" /> Show an outline of the
+                file next to the scroll bar.</span
+              >
+            </label>
+            <h2>Files</h2>
+            <label class="setting">
+              <strong>Auto Save</strong>
+              <span>When edited files are saved to the VM.</span>
+              <select name="autoSave">
+                <option value="off">Off</option>
+                <option value="afterDelay">After delay</option>
+                <option value="onFocusChange">On focus change</option>
+              </select>
+            </label>
+            <label class="setting checkbox">
+              <strong>Show All Files</strong>
+              <span
+                ><input type="checkbox" name="showAllFiles" /> Show the whole VM filesystem
+                in the explorer, not just /workspace and /tmp.</span
+              >
+            </label>
+            <h2>Run</h2>
+            <label class="setting">
+              <strong>Benchmark Runs</strong>
+              <span
+                >How many times a benchmark runs the program after a first run
+                that builds it and warms caches. It counts the instructions the VM
+                runs, which stay about the same in any browser.</span
+              >
+              <input type="number" name="benchRuns" min="1" max="20" />
+            </label>
+            <h2>Keyboard Shortcuts</h2>
+            <dl class="shortcuts">
+              {
+                SHORTCUTS.map(([keys, action]) => (
+                  <>
+                    <dt>{keys}</dt>
+                    <dd>{action}</dd>
+                  </>
+                ))
+              }
+            </dl>
+          </form>
+          <p id="empty" class="empty">Starting the Linux VM…</p>
+        </div>
+
+        <div id="sash-panel" class="sash horizontal" role="separator"></div>
+        <section class="panel">
+          <div class="pane-title">
+            Terminal
+            <span class="actions">
+              <button
+                id="split"
+                class="icon"
+                disabled
+                title="Open a second terminal (Ctrl+Shift+`)">+</button
+              >
+              <button
+                id="hide-panel"
+                class="icon"
+                title="Hide the terminal (Ctrl+`)">×</button
+              >
+            </span>
+          </div>
+          <div class="terminals">
+            <div id="term0" class="term"></div>
+            <div id="term1" class="term" hidden></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="status">Loading…</span>
+      <span class="spacer"></span>
+      <span id="cursor" hidden></span>
+      <span id="indent" hidden></span>
+      <span id="language" hidden></span>
+      <button id="autosave-status" title="Change auto save" hidden></button>
+      <span class="footer-info">© Winter Code Fest</span>
+      <a
+        class="footer-info"
+        href="https://github.com/dalurness/winter-code-fest"
+        target="_blank"
+        rel="noopener"><FaGithub />GitHub</a
+      >
+    </footer>
+
+    <div id="quick-open" class="quick-open" hidden>
+      <input
+        id="quick-open-input"
+        type="text"
+        placeholder="Search files by name"
+        aria-label="Search files by name"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <ul id="quick-open-results" role="listbox"></ul>
+    </div>
+    <ul id="context-menu" class="context-menu" role="menu" hidden></ul>
+
+    <script>
+      import "../../sandbox/main.ts";
+    </script>
+  </body>
+</html>
