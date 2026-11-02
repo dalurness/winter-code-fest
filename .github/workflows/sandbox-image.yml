@@ -10,6 +10,8 @@ on:
     branches: [main]
     paths:
       - sandbox/**
+      - "!sandbox/README.md"
+      - "!sandbox/screenshots/**"
       - src/sandbox/vm-options.ts
       - src/sandbox/languages.ts
       # A snapshot only restores into the v86 version that saved it
