@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/etc/apk/cache apk add \
       nodejs-current \
       go \
       ruby \
+      python3 \
       build-base \
       rust cargo \
       elixir gleam \
@@ -103,13 +104,14 @@ RUN for dir in /workspace/*/; do \
 # - Zig's headers and libcs for other targets: only x86-linux-musl runs here
 # - Erlang apps for GUIs, SNMP, telecom, ODBC, Java, FTP, SSH and LDAP
 # - Go's toolchain sources: go run uses the prebuilt tools in pkg/tool
+# - Python's bundled pip: there is no network to install packages from
 # - Kernel modules for hardware v86 does not emulate
 RUN apk del --no-network alpine-conf \
  && rm -rf /sbin/apk /usr/lib/libapk.so* /etc/apk /lib/apk /var/cache/apk /usr/share/apk \
       /etc/periodic /etc/crontabs /var/spool/cron \
       /opt/zig/lib/libc/darwin /opt/zig/lib/libc/freebsd /opt/zig/lib/libc/glibc \
       /opt/zig/lib/libc/mingw /opt/zig/lib/libc/netbsd /opt/zig/lib/libc/wasi \
-      /usr/lib/go/src/cmd \
+      /usr/lib/go/src/cmd /usr/lib/python3.*/ensurepip \
  && find /opt/zig/lib/libc/include -mindepth 1 -maxdepth 1 \
       ! -name 'x86-linux-musl' ! -name 'x86-linux-any' ! -name any-linux-any ! -name generic-musl \
       -exec rm -rf {} + \

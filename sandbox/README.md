@@ -9,6 +9,7 @@ The page is [src/pages/sandbox/index.astro](../src/pages/sandbox/index.astro) wi
 | Node 26 (TypeScript)     | `node/main.ts`            | `node main.ts` (type stripping)                   |
 | Go                       | `go/main.go`              | `go build`, then the binary                       |
 | Ruby                     | `ruby/main.rb`            | `ruby main.rb`                                    |
+| Python                   | `python/main.py`          | `python main.py`                                  |
 | Rust                     | `rust/src/main.rs`        | `cargo build -q`, then the binary                 |
 | C                        | `c/main.c`                | `cc -O1 -Wall -o main main.c && ./main`           |
 | Zig                      | `zig/src/main.zig`        | `zig build-exe`, then the binary                  |

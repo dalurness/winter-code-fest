@@ -72,6 +72,7 @@ run_file() {
   case "$file" in
     *.ts | *.js | *.mjs) mark start; exec node "$file" ;;
     *.rb) mark start; exec ruby "$file" ;;
+    *.py) mark start; exec python "$file" ;;
     *.go) built || go build -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.rs) built || rustc -O -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.c) built || cc -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;

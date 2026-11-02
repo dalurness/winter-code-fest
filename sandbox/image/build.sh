@@ -37,10 +37,10 @@ tar -f "$OUT_ROOTFS_TAR" --delete ".dockerenv" || true
 # Files are named by content hash and existing ones are skipped, so old files
 # stay valid for pages that are still open and rebuilds only compress what
 # changed. ZSTD_LEVEL=9 builds much faster for slightly bigger downloads.
-python3 flatten.py --level "${ZSTD_LEVEL:-19}" "$OUT_ROOTFS_TAR" "$OUT_ROOTFS_FLAT"
+python flatten.py --level "${ZSTD_LEVEL:-19}" "$OUT_ROOTFS_TAR" "$OUT_ROOTFS_FLAT"
 
 # The index goes last, once every file it points to exists
-python3 "$CACHE"/fs2json.py --zstd --out "$OUT_FSJSON.tmp" "$OUT_ROOTFS_TAR"
+python "$CACHE"/fs2json.py --zstd --out "$OUT_FSJSON.tmp" "$OUT_ROOTFS_TAR"
 mv "$OUT_FSJSON.tmp" "$OUT_FSJSON"
 
 echo "Created $OUT_FSJSON and $OUT_ROOTFS_FLAT"

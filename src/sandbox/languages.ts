@@ -11,6 +11,7 @@ export const LANGUAGES: Language[] = [
   { id: "node", label: "Node 26 (TypeScript)", dir: "node", main: "main.ts" },
   { id: "go", label: "Go", dir: "go", main: "main.go" },
   { id: "ruby", label: "Ruby", dir: "ruby", main: "main.rb" },
+  { id: "python", label: "Python", dir: "python", main: "main.py" },
   { id: "rust", label: "Rust", dir: "rust", main: "src/main.rs" },
   { id: "c", label: "C", dir: "c", main: "main.c" },
   { id: "zig", label: "Zig", dir: "zig", main: "src/main.zig" },
