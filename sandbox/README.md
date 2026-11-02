@@ -2,8 +2,6 @@
 
 The site's `/sandbox/` page boots a small 32-bit Alpine Linux in [v86](https://github.com/copy/v86), with a VS Code-style editor (Monaco), xterm.js terminals and a starter project for each language used in the Winter Code Fest community solutions. Everything runs in the browser; the VM has no network.
 
-![The editor in the Winter Day theme, with a Clank file and its benchmark](screenshots/editor-day.png)
-
 The page is [src/pages/sandbox/index.astro](../src/pages/sandbox/index.astro) with its code in [src/sandbox](../src/sandbox). This folder builds the VM image and snapshot it boots from.
 
 | Language                 | Template                  | Run                                               |
