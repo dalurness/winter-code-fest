@@ -4,6 +4,7 @@ import LayoutNavbar from "../../../layouts/LayoutNavbar.astro";
 import Question from "../../../components/Question.astro";
 import { DynamicSolution } from "../../../components/DynamicSolution";
 import { Link } from "../../../components/Link";
+import { LinkButton } from "../../../components/Button";
 // import { DayAheadDialog } from "../../../components/DayAheadDialog";
 
 export async function getStaticPaths() {
@@ -39,6 +40,14 @@ const { title } = entry.data;
   <Question day={day} title={title}>
     <Content />
   </Question>
+
+  <LinkButton
+    href={`/sandbox/?day=${entry.id}`}
+    size="sm"
+    className="self-start mb-6"
+  >
+    Open in the sandbox
+  </LinkButton>
 
   <DynamicSolution day={day} client:load />
   <h2 class="mt-20">Solutions</h2>
