@@ -26,3 +26,12 @@
     transparent calc(50% + 1px)
   );
 }
+
+/* Tailwind 4's preflight makes form fields transparent; keep them white */
+@layer base {
+  input,
+  textarea,
+  select {
+    background-color: white;
+  }
+}

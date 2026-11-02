@@ -54,6 +54,8 @@ export default defineConfig({
     plugins: [tailwindcss(), sandboxFiles()],
   },
   markdown: {
+    // Code blocks sit on the same light blue as the sandbox's Markdown preview
+    shikiConfig: { theme: "github-light" },
     processor: unified({
       remarkPlugins: [remarkMath],
       rehypePlugins: [rehypeMathJaxSvg],

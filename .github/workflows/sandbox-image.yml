@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           # Runs the TypeScript build script directly
-          node-version: 24
+          node-version: 26
           cache: npm
       - uses: actions/setup-python@v5
         with:

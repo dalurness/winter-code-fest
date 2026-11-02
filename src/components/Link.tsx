@@ -9,7 +9,8 @@ export function Link({ href, children, ...nativeProps }: LinkProps) {
     href = BASE_URL + href.slice(1);
   }
 
-  if (!HAS_EXTENSION.test(href) && !href.endsWith("/")) {
+  // Pages end in a slash; leave URLs with a query or hash alone
+  if (!HAS_EXTENSION.test(href) && !href.endsWith("/") && !/[?#]/.test(href)) {
     href += "/";
   }
 
