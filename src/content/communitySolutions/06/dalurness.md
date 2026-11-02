@@ -4,6 +4,9 @@ descriptions: ["zig", "go"]
 
 ### 2025 Solution Zig
 
+<details>
+<summary>Show Zig Solution</summary>
+
 #### Output
 
 ```
@@ -69,7 +72,12 @@ fn parseNum(c: u8) !isize {
 
 ```
 
+</details>
+
 ### 2024 Solution Go
+
+<details>
+<summary>Show Go Solution</summary>
 
 ```go
 package main
@@ -144,3 +152,5 @@ func main() {
     fmt.Printf("Total: %d\n", totalOffBalanceWeight)
 }
 ```
+
+</details>

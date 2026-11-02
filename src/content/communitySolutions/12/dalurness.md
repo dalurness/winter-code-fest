@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ## 2025
 
+<details>
+<summary>Show Zig Solution</summary>
+
 ```zig
 const std = @import("std");
 
@@ -69,3 +72,5 @@ fn processFile(file: *std.fs.File) !void {
     message.deinit(allocator);
 }
 ```
+
+</details>

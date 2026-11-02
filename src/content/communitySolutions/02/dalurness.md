@@ -4,6 +4,9 @@ descriptions: ["zig", "gleam"]
 
 ## 2025 Solution Zig
 
+<details>
+<summary>Show Zig Solution</summary>
+
 ```zig
 
 const std = @import("std");
@@ -67,7 +70,12 @@ pub fn main() !void {
 }
 ```
 
+</details>
+
 ### 2024 Solution Gleam
+
+<details>
+<summary>Show Gleam Solution</summary>
 
 ```gleam
 import gleam/int
@@ -147,3 +155,5 @@ fn num_to_str(first: String, second: String) {
 }
 
 ```
+
+</details>

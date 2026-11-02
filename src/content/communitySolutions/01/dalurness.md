@@ -2,7 +2,38 @@
 descriptions: ["zig", "gleam", "elixir", "first time using language"]
 ---
 
+### 2026 Solution Clank
+
+<details>
+<summary>Show Clank Solution</summary>
+
+```clank
+main : () -> <io, exn> () =
+  let words = fs.read("letters.txt")
+    |> str.words()
+  let counts = for w in words fold counts = {} do
+    match json.get(counts, w) {
+      Some(v) => json.set(counts, w, v + 1)
+      None    => json.set(counts, w, 1)
+    }
+  let to_num = fn(s) => match str.int(s) {
+    Some(n) => n
+    None => 0
+  }
+  let sorted = col.sortby(json.keys(counts), fn(a, b) => to_num(a) - to_num(b))
+  for k in sorted do
+    match json.get(counts, k) {
+      Some(n) => print("${k}: ${n}")
+      None    => ()
+    }
+```
+
+</details>
+
 ### 2025 Solution Zig
+
+<details>
+<summary>Show Zig Solution</summary>
 
 ```zig
 const std = @import("std");
@@ -69,7 +100,12 @@ pub fn main() !void {
 
 ```
 
+</details>
+
 ### 2024 Solution Gleam
+
+<details>
+<summary>Show Gleam Solution</summary>
 
 ```gleam
 import gleam/dict
@@ -127,7 +163,12 @@ fn find_country_count(filename: String) {
 }
 ```
 
+</details>
+
 ### 2023 Solution Elixir
+
+<details>
+<summary>Show Elixir Solution</summary>
 
 ```elixir
 writeString = case File.read("../letters.txt") do
@@ -149,3 +190,5 @@ end)
 {:ok, file} = File.open("output.txt", [:write])
 IO.binwrite(file, writeString)
 ```
+
+</details>

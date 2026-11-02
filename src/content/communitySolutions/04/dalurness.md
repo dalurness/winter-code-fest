@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ### 2025 Solution Zig
 
+<details>
+<summary>Show Zig Solution</summary>
+
 ### Output
 
 ```
@@ -120,3 +123,5 @@ fn maxInt(nums: []usize) usize {
     return max;
 }
 ```
+
+</details>

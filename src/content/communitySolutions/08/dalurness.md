@@ -4,6 +4,9 @@ descriptions: ["zig"]
 
 ## 2025
 
+<details>
+<summary>Show Zig Solution</summary>
+
 #### Output
 
 ```
@@ -123,5 +126,7 @@ fn findNumber(result_total: *u64, prev_number: u64, goal_number: u64, current_va
     }
 
 ```
+
+</details>
 
 </details>
