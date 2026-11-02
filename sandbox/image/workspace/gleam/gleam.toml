@@ -1,0 +1,8 @@
+name = "sandbox"
+version = "1.0.0"
+target = "erlang"
+
+[dependencies]
+# Older stdlib so 2024-era solutions (io.debug, string_builder) still build
+gleam_stdlib = ">= 0.44.0 and < 0.48.0"
+simplifile = ">= 2.0.0 and < 3.0.0"

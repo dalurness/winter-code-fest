@@ -1,0 +1,56 @@
+name: Build sandbox image
+
+# Builds the sandbox's VM image and snapshot (public/sandbox/v86/, about
+# 450 MB) and publishes it as the sandbox-image release. The site deploy
+# downloads it from there, so it never goes in git. Days and solutions are not
+# part of the image; they only need a site deploy.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - sandbox/**
+      - src/sandbox/vm-options.ts
+      - src/sandbox/languages.ts
+      # A snapshot only restores into the v86 version that saved it
+      - package-lock.json
+      - .github/workflows/sandbox-image.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sandbox-image
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Runs the TypeScript build script directly
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          # For the built-in compression.zstd
+          python-version: "3.14"
+      - run: sudo apt-get update && sudo apt-get install -y zstd
+      - run: npm ci
+      - name: Build the VM image
+        run: npm run sandbox:image
+      - name: Boot it, warm the toolchains and save the snapshot
+        run: npm run sandbox:state
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -cf sandbox-v86.tar -C public/sandbox v86
+          gh release view sandbox-image > /dev/null 2>&1 ||
+            gh release create sandbox-image --latest=false \
+              --title "Sandbox VM image" \
+              --notes "Built by .github/workflows/sandbox-image.yml from ${GITHUB_SHA}. The site deploy downloads sandbox-v86.tar from here."
+          gh release upload sandbox-image sandbox-v86.tar --clobber

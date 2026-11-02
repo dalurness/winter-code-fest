@@ -5,6 +5,11 @@ on:
     branches: [main]
   # Allows you to run this workflow manually from the Actions tab on GitHub.
   workflow_dispatch:
+  # Deploy a newly built sandbox image
+  workflow_run:
+    workflows: [Build sandbox image]
+    types: [completed]
+    branches: [main]
 
 # Allow this job to clone the repo and create a page deployment
 permissions:
@@ -14,10 +19,19 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout your repository using git
         uses: actions/checkout@v4
+      - name: Download the sandbox VM image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p public/sandbox
+          if ! gh release download sandbox-image --pattern sandbox-v86.tar --output - | tar -x -C public/sandbox; then
+            echo "::warning::No sandbox-image release to download; the sandbox page will not work"
+          fi
       - name: Install, build, and upload your site
         uses: withastro/action@v3
         with:

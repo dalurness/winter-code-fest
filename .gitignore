@@ -22,3 +22,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# sandbox VM image, built by sandbox/image/build.sh or downloaded in CI
+public/sandbox/v86/

@@ -1,0 +1,5 @@
+{
+  "name": "sandbox-node",
+  "private": true,
+  "type": "module"
+}
