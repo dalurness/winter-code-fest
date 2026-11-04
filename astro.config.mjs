@@ -22,6 +22,8 @@ const V86_DIR = resolve("public/sandbox/v86");
 function sandboxFiles() {
   return {
     name: "sandbox-files",
+    // Before Astro's own middleware, which answers unknown files with a 404 page
+    enforce: "pre",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = decodeURIComponent((req.url ?? "").split("?")[0] ?? "");
