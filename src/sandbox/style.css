@@ -31,6 +31,8 @@
   --scrollbar: #5d7dba40;
   --scrollbar-hover: #5d7dba66;
   --scrollbar-active: #5d7dba99;
+  --error: #c4314b;
+  --error-bg: #fbe9ec;
   --ui-font: "Poppins", "Poppins Fallback", system-ui, sans-serif;
   --sidebar-width: 240px;
   --panel-height: 38%;
@@ -57,6 +59,8 @@
   --scrollbar: #4d6ba844;
   --scrollbar-hover: #4d6ba866;
   --scrollbar-active: #4d6ba899;
+  --error: #be1100;
+  --error-bg: #5a1d1d;
   color-scheme: dark;
 }
 
@@ -246,6 +250,15 @@ button.icon svg {
 }
 
 /* Drag handles, drawn as a line on hover like VS Code's sashes */
+/* Placed by column, so the hidden sidebar keeps its place in the grid */
+.workbench > .sash {
+  grid-column: 2;
+}
+
+.workbench > .main {
+  grid-column: 3;
+}
+
 .sash {
   position: relative;
   z-index: 5;
@@ -326,6 +339,68 @@ button.icon svg {
   text-align: center;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* The same arrow for both, turned down when open. The tree is redrawn on each
+   click, so the folder just clicked plays the turn as an animation. */
+.tree [aria-expanded="true"] .twistie {
+  transform: rotate(90deg);
+}
+
+.tree [aria-expanded] .twistie.toggled {
+  animation: twistie-close 0.1s ease-out;
+}
+
+.tree [aria-expanded="true"] .twistie.toggled {
+  animation-name: twistie-open;
+}
+
+@keyframes twistie-open {
+  from {
+    transform: none;
+  }
+}
+
+@keyframes twistie-close {
+  from {
+    transform: rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree .twistie.toggled {
+    animation: none !important;
+  }
+}
+
+.tree .new-entry {
+  cursor: default;
+}
+
+.tree .new-entry input {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  padding: 0 3px;
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--accent);
+  outline: none;
+}
+
+.tree .new-entry.invalid input {
+  border-color: var(--error);
+}
+
+.tree .new-entry-error {
+  margin: 0 8px 2px 24px;
+  padding: 2px 6px;
+  font-size: 12px;
+  white-space: normal;
+  color: var(--text);
+  background: var(--error-bg);
+  border: 1px solid var(--error);
 }
 
 .tree .name {

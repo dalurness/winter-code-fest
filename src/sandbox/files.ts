@@ -41,6 +41,11 @@ export class FileService {
     return this.fs.SearchPath(path).id !== -1;
   }
 
+  isDir(path: string): boolean {
+    const { id } = this.fs.SearchPath(path);
+    return id !== -1 && (this.fs.GetInode(id).mode & S_IFMT) === S_IFDIR;
+  }
+
   /** Directory entries, directories first. */
   list(dir: string): Entry[] {
     const prefix = dir === "/" ? "" : dir;
@@ -115,6 +120,14 @@ export class FileService {
     const name = `${STAGING}/${Date.now()}-${String(this.staged++).padStart(6, "0")}`;
     await this.vm.create_file(`${name}.data`, data);
     await this.vm.create_file(`${name}.path`, encoder.encode(path));
+  }
+
+  /**
+   * Makes a folder and any missing parents. The guest sees new names on its
+   * next lookup, since cache=loose only keeps what it has already looked up.
+   */
+  mkdir(path: string) {
+    this.mkdirp(path);
   }
 
   /** Adds a file the guest has never seen, so it needs no staging. */

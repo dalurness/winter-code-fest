@@ -98,6 +98,31 @@ const SHORTCUTS = [
           Explorer
           <span class="actions">
             <button
+              id="new-file"
+              class="icon"
+              disabled
+              title="New file in the selected folder"
+            >
+              <!-- A page with a plus -->
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M9 14.5H3.5v-13h6l3 3V8 M9.5 1.5v3h3" />
+                <path d="M12.5 10v5 M10 12.5h5" />
+              </svg>
+            </button>
+            <button
+              id="new-folder"
+              class="icon"
+              disabled
+              title="New folder in the selected folder"
+            >
+              <!-- A folder with a plus -->
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M9 13.5H1.5v-10h4.5l1.5 1.5h7v4 M12.5 10v5 M10 12.5h5"
+                />
+              </svg>
+            </button>
+            <button
               id="refresh"
               class="icon"
               disabled

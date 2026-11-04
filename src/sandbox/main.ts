@@ -1,7 +1,7 @@
 import { badge } from "./badges";
 import { addContent, DAYS_DIR, fetchContent } from "./content";
 import { EDITOR_THEMES, monaco } from "./editor";
-import { FileService, type Entry } from "./files";
+import { FileService, normalize, type Entry } from "./files";
 import { renderMarkdown } from "./preview";
 import { languageOf } from "./languages";
 import {
@@ -32,6 +32,8 @@ const ui = {
   main: $("main"),
   tree: $("tree"),
   refresh: $<HTMLButtonElement>("refresh"),
+  newFile: $<HTMLButtonElement>("new-file"),
+  newFolder: $<HTMLButtonElement>("new-folder"),
   upload: $<HTMLButtonElement>("upload"),
   uploadInput: $<HTMLInputElement>("upload-input"),
   editorArea: document.querySelector<HTMLElement>(".editor-area")!,
@@ -965,6 +967,9 @@ function reveal(path: string) {
   }
 }
 
+/** The folder just opened or closed, whose arrow turns as the tree redraws */
+let toggled: string | undefined;
+
 function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
   const row = document.createElement("div");
   row.className = "row";
@@ -977,7 +982,9 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
 
   const twistie = document.createElement("span");
   twistie.className = "twistie";
-  twistie.textContent = isOpen === undefined ? "" : isOpen ? "⌄" : "›";
+  // One arrow, which CSS turns down for open folders
+  twistie.textContent = isOpen === undefined ? "" : "›";
+  if (entry.path === toggled) twistie.classList.add("toggled");
   const name = document.createElement("span");
   name.className = "name";
   name.textContent = entry.name;
@@ -991,7 +998,9 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
     row.onclick = () => {
       uploadDir = entry.path;
       if (!expanded.delete(entry.path)) expanded.add(entry.path);
+      toggled = entry.path;
       renderTree();
+      toggled = undefined;
     };
   } else {
     if (entry.kind === "link") {
@@ -1098,6 +1107,143 @@ ui.collapse.onclick = () => {
   expanded = new Set(["/", "/workspace"]);
   renderTree();
 };
+
+// --- New files and folders ----------------------------------------------
+
+/** Why a new entry can't be called `name` in `dir`, if it can't */
+function newEntryError(dir: string, name: string): string | undefined {
+  if (name.startsWith("/")) return "A name can't start with /";
+  const path = normalize(`${dir}/${name}`);
+  if (!path.startsWith(`${dir === "/" ? "" : dir}/`))
+    return `That would be outside ${dir}`;
+  if (files.exists(path)) return `${baseName(path)} already exists here`;
+  for (
+    let i = path.indexOf("/", dir.length + 1);
+    i > 0;
+    i = path.indexOf("/", i + 1)
+  ) {
+    const parent = path.slice(0, i);
+    if (files.exists(parent) && !files.isDir(parent))
+      return `${baseName(parent)} is a file`;
+  }
+  return;
+}
+
+/**
+ * Asks for a name in a row at the top of `dir` in the explorer, like VS Code.
+ * Enter makes it, Escape cancels, and a name with slashes makes the folders
+ * in it too.
+ */
+function newEntry(kind: "file" | "dir", dir = uploadDir) {
+  if (!ready) {
+    setStatus("Wait for the VM to start before adding files");
+    return;
+  }
+  if (!files.isDir(dir)) dir = "/workspace";
+  showSidebar(true);
+  reveal(`${dir}/`);
+  expanded.add(dir);
+  renderTree();
+
+  const parent = ui.tree.querySelector<HTMLElement>(
+    `.row[data-dir="${CSS.escape(dir)}"]`
+  )!;
+  const depth = (parseInt(parent.style.paddingLeft) - 4) / 8 + 1;
+  let group = parent.parentElement!.querySelector<HTMLElement>(":scope > ul");
+  if (!group) {
+    group = renderDir(dir, depth);
+    parent.after(group);
+  }
+
+  const li = document.createElement("li");
+  const entryRow = document.createElement("div");
+  entryRow.className = "row new-entry";
+  entryRow.style.paddingLeft = `${4 + depth * 8}px`;
+  const twistie = document.createElement("span");
+  twistie.className = "twistie";
+  twistie.textContent = kind === "dir" ? "›" : "";
+  let icon = kind === "dir" ? undefined : badge("");
+  const input = document.createElement("input");
+  input.spellcheck = false;
+  input.ariaLabel = kind === "dir" ? "Folder name" : "File name";
+  const message = document.createElement("div");
+  message.className = "new-entry-error";
+  message.hidden = true;
+  entryRow.append(twistie, ...(icon ? [icon] : []), input);
+  li.append(entryRow, message);
+  group.prepend(li);
+  input.focus();
+
+  const check = () => {
+    const error = input.value && newEntryError(dir, input.value);
+    message.textContent = error || "";
+    message.hidden = !error;
+    entryRow.classList.toggle("invalid", !!error);
+    return !error;
+  };
+  let done = false;
+  const finish = async (create: boolean) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    if (!create || !name || !check()) {
+      renderTree();
+      return;
+    }
+    const path = normalize(`${dir}/${name}`);
+    // A trailing slash makes a folder, as in VS Code
+    if (kind === "dir" || name.endsWith("/")) {
+      files.mkdir(path);
+      expanded.add(path);
+      uploadDir = path;
+      reveal(`${path}/`);
+      renderTree();
+      setStatus(`Made ${path}`);
+    } else {
+      await files.write(path, "");
+      uploadDir = dirName(path);
+      reveal(path);
+      renderTree();
+      await openFile(path);
+    }
+  };
+
+  input.oninput = () => {
+    check();
+    if (icon) {
+      const next = badge(baseName(input.value) || "");
+      icon.replaceWith(next);
+      icon = next;
+    }
+  };
+  input.onkeydown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (check()) void finish(true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      void finish(false);
+    }
+  };
+  input.onblur = () => void finish(true);
+}
+
+ui.tree.addEventListener("contextmenu", (event) => {
+  const row = (event.target as Element).closest<HTMLElement>(".row[data-path]");
+  if (!row) return;
+  event.preventDefault();
+  const dir = row.dataset["dir"] ?? dirName(row.dataset["path"]!);
+  showMenu(
+    [
+      ["New File…", () => newEntry("file", dir)],
+      ["New Folder…", () => newEntry("dir", dir)],
+    ],
+    event
+  );
+});
+
+ui.newFile.onclick = () => newEntry("file");
+ui.newFolder.onclick = () => newEntry("dir");
 
 // --- Upload and drop files -----------------------------------------------
 
@@ -1653,6 +1799,13 @@ if (!(await openFromParams(params))) await openFile("/workspace/README.md");
 ui.empty.textContent =
   "Open a file from the explorer, or press Ctrl+P to find one.";
 
-for (const el of [ui.refresh, ui.reset, ui.split, ui.upload])
+for (const el of [
+  ui.refresh,
+  ui.reset,
+  ui.split,
+  ui.upload,
+  ui.newFile,
+  ui.newFolder,
+])
   el.disabled = false;
 updateRunButton();
