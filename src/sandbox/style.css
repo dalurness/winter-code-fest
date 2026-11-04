@@ -122,6 +122,7 @@ button.icon {
   background: none;
   border-color: transparent;
   padding: 0 5px;
+  font-size: 16px;
   line-height: 20px;
   color: var(--text);
 }
@@ -132,9 +133,9 @@ button.icon.on {
 }
 
 button.icon svg {
-  width: 16px;
-  height: 16px;
-  vertical-align: -3px;
+  width: 18px;
+  height: 18px;
+  vertical-align: -4px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.2;
@@ -154,6 +155,13 @@ button.icon svg {
 
 .spacer {
   flex: 1;
+}
+
+/* A symbol in a text button, a little larger than the text */
+.glyph {
+  font-size: 1.25em;
+  line-height: 1;
+  vertical-align: -0.1em;
 }
 
 /* --- Title bar --- */
@@ -317,7 +325,7 @@ button.icon svg {
   width: 16px;
   text-align: center;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .tree .name {
@@ -361,9 +369,9 @@ button.icon svg {
 /* File type badges in the explorer and tabs */
 .badge {
   flex: none;
-  width: 16px;
+  width: 18px;
   font:
-    700 9px/1 ui-monospace,
+    700 11px/1 ui-monospace,
     Menlo,
     Consolas,
     monospace;
@@ -481,6 +489,8 @@ button.icon svg {
   height: 20px;
   padding: 0;
   border: 0;
+  font-size: 16px;
+  line-height: 20px;
   background: none;
   color: inherit;
   border-radius: 4px;
@@ -912,6 +922,11 @@ button.icon svg {
   height: 100%;
   color: inherit;
   text-decoration: none;
+}
+
+.statusbar a svg {
+  width: 14px;
+  height: 14px;
 }
 
 .statusbar a:hover {
