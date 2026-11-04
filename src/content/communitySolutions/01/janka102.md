@@ -1,8 +1,63 @@
 ---
-descriptions: ["linux-x86-assembly", "gleam", "ruby"]
+descriptions: ["linux-x86-assembly", "gleam", "ruby", "go"]
 ---
 
+## 2026
+
+```go
+package main
+
+import (
+	"bufio"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"os"
+)
+
+func main() {
+	file, err := os.Open("/workspace/days/01/letters_challenge.txt")
+	defer file.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	reader := bufio.NewReader(file)
+
+	letters := make([]int, 0)
+	for {
+		var country int
+		_, err := fmt.Fscan(reader, &country)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if country >= len(letters) {
+			for range (country - len(letters)) + 1 {
+				letters = append(letters, 0)
+			}
+		}
+
+		letters[country]++
+	}
+
+	for country, count := range letters {
+		if count > 0 {
+			fmt.Printf("%d: %d\n", country, count)
+		}
+	}
+}
+```
+
 ## 2025
+
+<details>
+<summary>Show Ruby Solution</summary>
 
 Used Ruby this year. [RuboCop](https://rubocop.org/) is pretty nifty, it transformed a few of my `if` statements into `unless`s.
 
@@ -59,6 +114,8 @@ if __FILE__ == $PROGRAM_NAME
   challenge.solve options[:verbose]
 end
 ```
+
+</details>
 
 ## 2024
 
