@@ -32,7 +32,9 @@ export function vmOptions(
     disable_keyboard: true,
     disable_mouse: true,
     disable_speaker: true,
+    // ttyS1 is the second terminal, ttyS2 sb-agent's line to the page
     uart1: true,
+    uart2: true,
     bzimage_initrd_from_filesystem: true,
     cmdline: CMDLINE,
     filesystem: {

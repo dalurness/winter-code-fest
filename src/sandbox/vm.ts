@@ -22,6 +22,29 @@ export interface Fs9p {
   set_data(id: number, data: Uint8Array): Promise<void>;
   CreateDirectory(name: string, parentid: number): number;
   CreateFile(name: string, parentid: number): number;
+  // The rest are what the guest's changes go through, which GuestSync watches
+  Write(
+    id: number,
+    offset: number,
+    count: number,
+    data: Uint8Array
+  ): Promise<void>;
+  ChangeSize(id: number, size: number): Promise<void>;
+  CreateNode(
+    name: string,
+    parentid: number,
+    major: number,
+    minor: number
+  ): number;
+  CreateSymlink(name: string, parentid: number, target: string): number;
+  Link(parentid: number, targetid: number, name: string): number;
+  Unlink(parentid: number, name: string): number;
+  Rename(
+    olddirid: number,
+    oldname: string,
+    newdirid: number,
+    newname: string
+  ): Promise<number>;
   storage: Parameters<Bundles["hook"]>[0];
 }
 

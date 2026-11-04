@@ -7,5 +7,4 @@ A small Linux VM running in your browser, with no network. Everything here is lo
 - `days/` has every day's question, its input files and the community solutions.
 - Starter projects: `node` (TypeScript), `go`, `ruby`, `python`, `rust`, `c`, `cpp`, `zig`, `gleam`, `elixir`, `erlang`, `lua`, `php`, `perl`, `clank` (its whole spec is in `clank/SPEC.md`), `asm` (x86, AT&T syntax) and `bash`.
 - `/tmp` is a good place for scratch files.
-
-Run `sb sync` in a terminal to pick up files saved in the editor without pressing Run.
+- The editor and the terminals see each other's changes as they happen: a saved file is ready in the terminal, and files a program writes show up in the editor.

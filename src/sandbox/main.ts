@@ -12,6 +12,7 @@ import {
   type AutoSave,
   type Settings,
 } from "./settings";
+import { GuestSync, type GuestChanges } from "./sync";
 import { SerialTerminal, TERMINAL_THEMES } from "./terminal";
 import {
   createVm,
@@ -110,6 +111,8 @@ const vm = createVm(snapshot, bundles);
 // Handy for poking at the emulator from devtools while developing
 if (import.meta.env.DEV) Object.assign(window, { vm });
 const files = new FileService(vm);
+const sync = new GuestSync(vm, onGuestChange);
+files.onStaged = (path) => sync.saved(path);
 const counter = new InstructionCounter(vm);
 const terms = [
   new SerialTerminal(vm, 0, $("term0"), counter),
@@ -803,19 +806,50 @@ window.addEventListener("blur", () => {
   if (settings.autoSave === "onFocusChange") void saveAll();
 });
 
-/** Pick up changes made inside the VM (new files, files edited in the terminal). */
+/** Loads a file's tab again from the VM, unless it has unsaved edits */
+async function reload(path: string, file: OpenFile) {
+  if (isDirty(file) || !files.exists(path)) return;
+  const text = await files.read(path);
+  // Typed into while it was read, or already the same
+  if (isDirty(file) || text === file.model.getValue()) return;
+  // An edit rather than setValue, so the cursor stays put and Ctrl+Z undoes it
+  file.model.pushEditOperations(
+    [],
+    [{ range: file.model.getFullModelRange(), text }],
+    () => null
+  );
+  file.savedVersion = file.model.getAlternativeVersionId();
+  if (path === active && !ui.preview.hidden) updatePreview({ focus: false });
+}
+
+/** Re-reads every open file and redraws the explorer (the Refresh button) */
 async function refresh() {
-  for (const [path, file] of open) {
-    if (!isFile(file) || isDirty(file) || !files.exists(path)) continue;
-    const text = await files.read(path);
-    if (text !== file.model.getValue()) {
-      file.model.setValue(text);
-      file.savedVersion = file.model.getAlternativeVersionId();
-    }
-  }
+  for (const [path, file] of open) if (isFile(file)) await reload(path, file);
   renderTabs();
   renderTree();
-  if (!ui.preview.hidden) updatePreview({ focus: false });
+}
+
+/** Picks up what programs in the VM changed, as GuestSync reports it */
+function onGuestChange({ written, replaced, dirs }: GuestChanges) {
+  for (const [path, file] of open) {
+    // The guest has an older copy until sb-agent applies the save
+    if (!isFile(file) || sync.isApplying(path)) continue;
+    const { id, parentid } = files.locate(path);
+    if (written.has(id) || replaced.has(`${parentid}/${baseName(path)}`))
+      void reload(path, file);
+  }
+  if (!dirs.size) return;
+  const shown = new Set(
+    [...expanded, ...sections().map((s) => s.path)].map(
+      (dir) => files.locate(dir).id
+    )
+  );
+  // Not while a new file's name is being typed in it; that redraws it after
+  if (
+    [...dirs].some((id) => shown.has(id)) &&
+    !ui.tree.querySelector(".new-entry")
+  )
+    renderTree();
 }
 
 // --- Markdown preview ----------------------------------------------------
@@ -1782,7 +1816,6 @@ function onShortcutKey(event: KeyboardEvent) {
   void action();
 }
 window.addEventListener("keydown", onShortcutKey, { capture: true });
-window.addEventListener("focus", () => !running && refresh());
 window.addEventListener("beforeunload", (event) => {
   if ([...open.values()].some(isDirty)) event.preventDefault();
 });

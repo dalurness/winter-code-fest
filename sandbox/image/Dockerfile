@@ -51,10 +51,11 @@ RUN wget -q https://github.com/dalurness/clank/archive/$CLANK_COMMIT.tar.gz -O /
  && cd / && rm -rf /tmp/clank /tmp/clank.tar.gz /tmp/clank-cache && bundle-mark clank
 
 # ttyS0 is the main terminal, ttyS1 the optional second one. Both log in as
-# root with no password.
+# root with no password. ttyS2 is sb-agent's line to the page.
 RUN sed -i 's/^tty1::/#tty1::/' /etc/inittab \
  && echo 'ttyS0::respawn:/sbin/agetty --autologin root -s ttyS0 115200 xterm-256color' >> /etc/inittab \
  && echo 'ttyS1::respawn:/sbin/agetty --autologin root -s ttyS1 115200 xterm-256color' >> /etc/inittab \
+ && echo 'ttyS2::respawn:/usr/local/bin/sb-agent' >> /etc/inittab \
  && echo "root:" | chpasswd
 
 RUN setup-hostname sandbox
@@ -80,7 +81,7 @@ RUN printf '%s\n' \
       'export PS1="\w \$ "' \
       'cd /workspace' >> /root/.profile
 
-COPY --chmod=755 sb /usr/local/bin/sb
+COPY --chmod=755 sb sb-agent /usr/local/bin/
 # sb subtracts estimates of what is not the program from its instruction counts:
 # - sb-empty only exits, linked against libc like most programs, for the cost
 #   of starting and ending a process

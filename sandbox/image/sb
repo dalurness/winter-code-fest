@@ -4,13 +4,16 @@
 #   sb sync  [ROWS COLS]          apply saved files, set the clock and terminal size
 #   sb run   [ROWS COLS [FILE]]   same, then run FILE (or ./run.sh) and time it
 #   sb bench ROWS COLS FILE [N]   same, then run it N more times with no output
-#   sb exec  PROGRAM [ARGS]             mark where measuring starts, then run PROGRAM
+#   sb exec  PROGRAM [ARGS]       mark where measuring starts, then run PROGRAM
+#   sb apply                      only apply saved files (sb-agent runs this)
 #
 # SB_CALIBRATE=1 makes run measure background work first, as bench always does.
 #
 # The root is mounted with cache=loose, so the guest does not see files the
 # editor writes from JS. The editor also stages each save in /.sb, and copying
-# it over the target from in here updates the guest's cache.
+# it over the target from in here updates the guest's cache. sb-agent does
+# that as soon as the editor saves, so the rest of sb only catches up with a
+# save that arrives just before a run.
 #
 # The clock matters because cargo and the C template compare mtimes with the
 # editor's saves, which have the browser's time. After restoring a snapshot,
@@ -47,19 +50,34 @@ if [ "$1" = exec ]; then
   exec "$@"
 fi
 
+# Copies staged saves over their targets, oldest first. Locked, since sb-agent
+# and a run can both get here, and a file applied twice at once could be
+# truncated by one while the other copies it.
+apply() {
+  exec 9> /run/sb-apply.lock
+  flock 9
+  for staged in /.sb/*.path; do
+    [ -e "$staged" ] || continue
+    target=$(cat "$staged")
+    mkdir -p "${target%/*}"
+    cat "${staged%.path}.data" > "$target"
+    rm -f "${staged%.path}.data" "$staged"
+  done
+  exec 9>&-
+}
+
+if [ "$1" = apply ]; then
+  apply
+  exit
+fi
+
 cmd=$1
 hwclock -s -u
 [ -n "$3" ] && stty rows "$2" cols "$3"
 file=$4
 runs=${5:-3}
 
-for staged in /.sb/*.path; do
-  [ -e "$staged" ] || continue
-  target=$(cat "$staged")
-  mkdir -p "${target%/*}"
-  cat "${staged%.path}.data" > "$target"
-  rm -f "${staged%.path}.data" "$staged"
-done
+apply
 
 # Runs a file: with its project's run.sh if it is in one (the templates under
 # /workspace), otherwise with the toolchain for its extension. Community
