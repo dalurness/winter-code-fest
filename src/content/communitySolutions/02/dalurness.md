@@ -1,6 +1,70 @@
 ---
-descriptions: ["zig", "gleam"]
+descriptions: ["golang", "zig", "gleam"]
 ---
+
+## 2026 Solution Golang
+
+<details>
+<summary>Show Golang Solution</summary>
+
+```golang
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+	"strconv"
+)
+
+var NUM_OFFSET = 65
+
+func main() {
+	files := []string{"../days/02/small_message_encoded.txt", "../days/02/large_message_encoded.txt"}
+	for _, f := range files {
+		doTheThing(f)
+	}
+}
+
+func doTheThing(filename string) {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatalf("Failed to open file: %w", err)
+	}
+
+	decoded := ""
+	s := []rune(string(content))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			sl := len(s)
+			if i+1 < sl && s[i+1] == '\\' {
+				decoded += string('\\')
+				i += 1
+				continue
+			}
+
+			if i+3 < sl {
+				 num, err := strconv.Atoi(string(s[i+1:i+3]))
+				 if err != nil {
+					log.Fatalf("Not a num")
+				 }
+				 if num > 25 {
+					num -= 26
+				 } else if  num < 26 {
+					num += 32
+				 }
+				 decoded += string(num + NUM_OFFSET)
+				 i += 2
+				 continue
+			}
+		}
+		decoded += string(s[i])
+	}
+	fmt.Println(decoded)
+}
+```
+
+</details>
 
 ## 2025 Solution Zig
 
