@@ -168,6 +168,15 @@ const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
 function applySettings() {
   const theme = resolveTheme(settings.theme);
   document.documentElement.dataset["theme"] = theme;
+  // The title bar of the installed app, the same color as the page's
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute(
+      "content",
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--chrome")
+        .trim()
+    );
   monaco.editor.setTheme(EDITOR_THEMES[theme]);
   terms.forEach((t) => t.setTheme(TERMINAL_THEMES[theme]));
   editor.updateOptions({
