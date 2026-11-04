@@ -1,5 +1,5 @@
 ---
-descriptions: ["zig", "gleam", "elixir", "first time using language"]
+descriptions: ["zig", "gleam", "elixir", "clank"]
 ---
 
 ### 2026 Solution Clank
