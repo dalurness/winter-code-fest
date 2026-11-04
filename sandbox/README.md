@@ -54,7 +54,7 @@ To build it locally you need Docker or Podman, Python 3.14+ (for its built-in `c
 
 ```bash
 npm run sandbox:image   # build the image into public/sandbox/v86/ (ZSTD_LEVEL=9 for faster builds)
-npm run sandbox:state   # boot it headless, run every template twice, save the snapshot
+npm run sandbox:state   # boot it headless, run every template twice, save the snapshot, bundle the files
 npm run dev             # then open /winter-code-fest/sandbox/
 ```
 
@@ -63,6 +63,12 @@ npm run dev             # then open /winter-code-fest/sandbox/
 ## How it works
 
 - **Image:** [image/Dockerfile](image/Dockerfile) follows v86's `tools/docker/alpine` and adds the toolchains and the templates in [image/workspace](image/workspace), then runs each template once so build caches are warm (cargo `target/`, Go's build and `go run` caches, zig-cache, gleam `build/`, Node's compile cache via `NODE_COMPILE_CACHE`). `npm run state` runs them twice more inside the emulator before saving the snapshot. [image/build.sh](image/build.sh) exports it as a 9p filesystem: `alpine-fs.json` (the index) plus one zstd file per file, fetched lazily, so a Ruby user never downloads rustc. Files are named by content hash and never deleted, so rebuilding while a page is open does not break it; `alpine-fs.json` is replaced last.
+- **Bundles:** one request per file is slow when every request costs a round trip (Go's first run reads about 900 files), so `npm run sandbox:state` also packs the per-file zstd files into a few bundles ([image/bundle.py](image/bundle.py)). Each install step in the Dockerfile records the files it added (`bundle-mark`), which decides each file's bundle. Then the snapshot is restored like the page does and every template runs once, and the order the VM reads files in becomes the order inside each bundle. The bundles are:
+  - **base:** files outside any language that a run read (bash, `sb`, libc). The page downloads it right after the snapshot restores.
+  - **One per large language** (Go, Rust, C/C++, Zig, Node, Python, Erlang/Elixir/Gleam), and **rest** for the small ones together. The page starts streaming one when a file of that language is opened, or when the VM first reads a file in it. A file is usable as soon as its bytes arrive. One that is more than 2 MB further down the stream is fetched on its own with a range request.
+  - **misc:** everything no run read (the kernel, modules, docs). It is never downloaded whole, only single files with range requests.
+
+  Bundles are saved in the browser's Cache Storage, named by content, so a later visit only downloads the ones that changed. The site only publishes the bundles, not the per-file directory, so `?fresh` cold boots only work locally.
 - **Snapshot:** [scripts/build-state.ts](scripts/build-state.ts) shares its VM options with the page ([src/sandbox/vm-options.ts](../src/sandbox/vm-options.ts)); a saved state only restores into a VM with the same memory size and devices, and the same v86 version. Before saving, it fills free guest memory with zeros so the snapshot compresses to about 33 MB. Reset restores the same snapshot in place.
 - **Files:** [src/sandbox/files.ts](../src/sandbox/files.ts) reads and writes v86's in-JS 9p filesystem directly. Existing files are rewritten in place, because `create_file` adds a second inode under the same name that the guest's cached dentry never sees. The root is mounted `cache=loose`, so the guest keeps its cached copy of a file written from JS; each save is also staged in `/.sb`, and `sb` copies staged files over their targets from inside the guest. Dropping the whole page cache instead made every run re-read its toolchain over 9p (Node took 11 s instead of 6).
 - **Run:** saves dirty files and types `sb run … FILE` into the active terminal. `sb` ([image/sb](image/sb)) also sets the guest clock from v86's emulated RTC, which follows the browser's clock (cargo and the C template compare mtimes with the editor's saves, and the kernel's clock falls behind after a snapshot restore or while the tab is hidden), and the terminal size, then prints how long the run took inside the guest and how many instructions it took. The root is mounted with `ignoreqv`: v86 reports every file's version as 0, which otherwise makes Linux skip its page cache and re-read files on every open.

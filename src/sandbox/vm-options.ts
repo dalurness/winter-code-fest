@@ -14,8 +14,15 @@ const CMDLINE =
   "rw root=host9p rootfstype=9p rootflags=trans=virtio,cache=loose,ignoreqv " +
   "modules=virtio_pci tsc=reliable console=ttyS0";
 
-/** `assets` is the directory (or URL) holding bios/, alpine-fs.json and alpine-rootfs-flat/ */
-export function vmOptions(assets: string): V86Options {
+/**
+ * `assets` is the directory (or URL) holding bios/, alpine-fs.json and
+ * alpine-rootfs-flat/. A snapshot has its own copy of the file index, so with
+ * one v86 would download alpine-fs.json only to ignore it.
+ */
+export function vmOptions(
+  assets: string,
+  { snapshot = false } = {}
+): V86Options {
   return {
     bios: { url: `${assets}bios/seabios.bin` },
     vga_bios: { url: `${assets}bios/vgabios.bin` },
@@ -30,7 +37,7 @@ export function vmOptions(assets: string): V86Options {
     cmdline: CMDLINE,
     filesystem: {
       baseurl: `${assets}alpine-rootfs-flat/`,
-      basefs: `${assets}alpine-fs.json`,
+      ...(!snapshot && { basefs: `${assets}alpine-fs.json` }),
     },
   };
 }

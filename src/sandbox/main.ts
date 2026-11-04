@@ -3,6 +3,7 @@ import { addContent, DAYS_DIR, fetchContent } from "./content";
 import { EDITOR_THEMES, monaco } from "./editor";
 import { FileService, type Entry } from "./files";
 import { renderMarkdown } from "./preview";
+import { languageOf } from "./languages";
 import {
   loadSettings,
   onSystemThemeChange,
@@ -12,7 +13,12 @@ import {
   type Settings,
 } from "./settings";
 import { SerialTerminal, TERMINAL_THEMES } from "./terminal";
-import { createVm, fetchSnapshot, InstructionCounter } from "./vm";
+import {
+  createVm,
+  fetchBundles,
+  fetchSnapshot,
+  InstructionCounter,
+} from "./vm";
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -88,6 +94,7 @@ const params = new URLSearchParams(location.search);
 const started = performance.now();
 setStatus("Downloading snapshot…");
 const contentPromise = fetchContent();
+const bundlesPromise = fetchBundles();
 const snapshot = params.has("fresh") ? undefined : await fetchSnapshot();
 metrics.snapshot = !!snapshot;
 setStatus(
@@ -96,7 +103,8 @@ setStatus(
     : "Booting (no snapshot, this takes a while)…"
 );
 
-const vm = createVm(snapshot);
+const bundles = await bundlesPromise;
+const vm = createVm(snapshot, bundles);
 // Handy for poking at the emulator from devtools while developing
 if (import.meta.env.DEV) Object.assign(window, { vm });
 const files = new FileService(vm);
@@ -308,6 +316,9 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
 }
 
 async function openFile(path: string, { focus = true } = {}) {
+  // The language's files start downloading before the first run needs them
+  const language = languageOf(path);
+  if (language) bundles?.prefetchLanguage(language.id);
   if (!open.has(path)) {
     const file = await loadFile(path);
     if (!file) return;

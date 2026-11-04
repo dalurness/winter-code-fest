@@ -26,3 +26,27 @@ export const LANGUAGES: Language[] = [
   { id: "asm", label: "x86 assembly (gas)", dir: "asm", main: "main.s" },
   { id: "bash", label: "Bash", dir: "bash", main: "main.sh" },
 ];
+
+/** Extensions besides each template's main file's */
+const EXTENSIONS: Record<string, string> = {
+  js: "node",
+  mjs: "node",
+  cc: "cpp",
+  cxx: "cpp",
+  ex: "elixir",
+  hrl: "erlang",
+  S: "asm",
+};
+
+/** The language a file is in, from its template directory or extension */
+export function languageOf(path: string): Language | undefined {
+  const inTemplate = LANGUAGES.find((l) =>
+    path.startsWith(`/workspace/${l.dir}/`)
+  );
+  if (inTemplate) return inTemplate;
+  const extension = path.slice(path.lastIndexOf(".") + 1);
+  const id = EXTENSIONS[extension];
+  return LANGUAGES.find((l) =>
+    id ? l.id === id : l.main.endsWith(`.${extension}`)
+  );
+}

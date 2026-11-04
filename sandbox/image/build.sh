@@ -31,6 +31,11 @@ docker create --platform linux/386 -t -i --name "$CONTAINER_NAME" "$IMAGE_NAME"
 docker export "$CONTAINER_NAME" -o "$OUT_ROOTFS_TAR"
 docker rm "$CONTAINER_NAME"
 
+# bundle-mark's lists of which install added which files, for bundle.py
+rm -rf "$CACHE"/bundle-marks && mkdir "$CACHE"/bundle-marks
+tar -xf "$OUT_ROOTFS_TAR" -C "$CACHE"/bundle-marks --strip-components=1 .bundles
+tar -f "$OUT_ROOTFS_TAR" --delete .bundles
+
 # https://github.com/iximiuz/docker-to-linux/issues/19#issuecomment-1242809707
 tar -f "$OUT_ROOTFS_TAR" --delete ".dockerenv" || true
 
@@ -43,5 +48,5 @@ python flatten.py --level "${ZSTD_LEVEL:-19}" "$OUT_ROOTFS_TAR" "$OUT_ROOTFS_FLA
 python "$CACHE"/fs2json.py --zstd --out "$OUT_FSJSON.tmp" "$OUT_ROOTFS_TAR"
 mv "$OUT_FSJSON.tmp" "$OUT_FSJSON"
 
-echo "Created $OUT_FSJSON and $OUT_ROOTFS_FLAT"
+echo "Created $OUT_FSJSON and $OUT_ROOTFS_FLAT. npm run sandbox:state bundles them."
 du -sh "$OUT_FSJSON" "$OUT_ROOTFS_FLAT"

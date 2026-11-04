@@ -1,6 +1,7 @@
 import { V86 } from "v86";
 import wasmUrl from "v86/build/v86.wasm?url";
 import { vmOptions } from "./vm-options.ts";
+import { Bundles } from "./bundles.ts";
 
 const ASSETS = `${import.meta.env.BASE_URL}sandbox/v86/`;
 const SNAPSHOT_URL = `${ASSETS}alpine-state.bin.zst`;
@@ -21,6 +22,7 @@ export interface Fs9p {
   set_data(id: number, data: Uint8Array): Promise<void>;
   CreateDirectory(name: string, parentid: number): number;
   CreateFile(name: string, parentid: number): number;
+  storage: Parameters<Bundles["hook"]>[0];
 }
 
 /** v86 fetches an inode with this status from the image when it is read */
@@ -108,13 +110,25 @@ export class InstructionCounter {
   }
 }
 
-export function createVm(snapshot?: ArrayBuffer): Emulator {
-  return new V86({
-    ...vmOptions(ASSETS),
+export function createVm(
+  snapshot: ArrayBuffer | undefined,
+  bundles: Bundles | undefined
+): Emulator {
+  const vm = new V86({
+    ...vmOptions(ASSETS, { snapshot: !!snapshot }),
     wasm_path: wasmUrl,
     ...(snapshot && { initial_state: { buffer: snapshot } }),
   }) as Emulator;
+  if (bundles) {
+    // Before the snapshot is restored and the guest reads anything
+    vm.add_listener("emulator-ready", () => bundles.hook(vm.fs9p.storage));
+    vm.add_listener("emulator-loaded", () => bundles.prefetch("base"));
+  }
+  return vm;
 }
+
+/** The image's bundles, if it was built with them */
+export const fetchBundles = () => Bundles.load(ASSETS);
 
 /**
  * Downloads the saved VM state, if one was built. Returns undefined when the

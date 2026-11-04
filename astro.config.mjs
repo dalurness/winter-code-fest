@@ -38,8 +38,20 @@ function sandboxFiles() {
           return;
         }
         res.setHeader("Content-Type", "application/octet-stream");
-        res.setHeader("Content-Length", size);
         res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Accept-Ranges", "bytes");
+        // The page fetches single files out of a bundle, like GitHub Pages allows
+        const range = /^bytes=(\d+)-(\d+)$/.exec(req.headers.range ?? "");
+        if (range) {
+          const start = Number(range[1]);
+          const end = Math.min(Number(range[2]), size - 1);
+          res.statusCode = 206;
+          res.setHeader("Content-Range", `bytes ${start}-${end}/${size}`);
+          res.setHeader("Content-Length", end - start + 1);
+          createReadStream(file, { start, end }).pipe(res);
+          return;
+        }
+        res.setHeader("Content-Length", size);
         createReadStream(file).pipe(res);
       });
     },

@@ -48,8 +48,10 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+        # The page reads files from bundles/, so the same files one by one
+        # (alpine-rootfs-flat/) would only double the site's size
         run: |
-          tar -cf sandbox-v86.tar -C public/sandbox v86
+          tar -cf sandbox-v86.tar -C public/sandbox --exclude v86/alpine-rootfs-flat v86
           gh release view sandbox-image > /dev/null 2>&1 ||
             gh release create sandbox-image --latest=false \
               --title "Sandbox VM image" \
