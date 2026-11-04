@@ -155,6 +155,8 @@ const editor = monaco.editor.create(ui.editor, {
   guides: { bracketPairs: "active" },
   // Always shown instead of fading out when the mouse leaves
   scrollbar: { vertical: "visible" },
+  // Dropped files are uploaded instead, see onEditorDrop
+  dropIntoEditor: { enabled: false },
 });
 
 const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
@@ -1381,6 +1383,7 @@ ui.tree.addEventListener("drop", async (event) => {
 function onEditorDragOver(event: DragEvent) {
   if (!isFileDrag(event)) return;
   event.preventDefault();
+  event.stopPropagation();
   event.dataTransfer!.dropEffect = "copy";
   ui.editorArea.classList.add("drop-target");
 }
@@ -1388,6 +1391,7 @@ function onEditorDragOver(event: DragEvent) {
 async function onEditorDrop(event: DragEvent) {
   if (!isFileDrag(event)) return;
   event.preventDefault();
+  event.stopPropagation();
   clearDropTargets();
   const dir = fileAt(active) ? dirName(active!) : uploadDir;
   const paths = await upload(await droppedFiles(event.dataTransfer!), dir);
@@ -1395,12 +1399,15 @@ async function onEditorDrop(event: DragEvent) {
   for (const path of paths.slice(0, 10)) await openFile(path);
 }
 
-ui.editorArea.addEventListener("dragover", onEditorDragOver);
-ui.editorArea.addEventListener("drop", onEditorDrop);
+// Captured, so Monaco and the terminal never get the drop first
+ui.editorArea.addEventListener("dragover", onEditorDragOver, { capture: true });
+ui.editorArea.addEventListener("drop", onEditorDrop, { capture: true });
 
-// Anywhere else, keep the browser from opening the file in place of the page
+// Anywhere else, keep the browser from opening the file in place of the page.
+// This runs after the drop targets' own handlers, so it leaves the ones they
+// accepted alone: the last dropEffect set is the one the browser uses.
 window.addEventListener("dragover", (event) => {
-  if (!isFileDrag(event)) return;
+  if (!isFileDrag(event) || event.defaultPrevented) return;
   event.preventDefault();
   event.dataTransfer!.dropEffect = "none";
 });
