@@ -143,6 +143,8 @@ const editor = monaco.editor.create(ui.editor, {
   stickyScroll: { enabled: true },
   bracketPairColorization: { enabled: true },
   guides: { bracketPairs: "active" },
+  // Always shown instead of fading out when the mouse leaves
+  scrollbar: { vertical: "visible" },
 });
 
 const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
@@ -159,7 +161,7 @@ function applySettings() {
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
     wordWrap: settings.wordWrap ? "on" : "off",
-    minimap: { enabled: settings.minimap },
+    minimap: { enabled: settings.minimap, showSlider: "always" },
     fontSize: settings.fontSize,
   });
   ui.autoSave.textContent = AUTO_SAVE_LABELS[settings.autoSave];
@@ -456,7 +458,17 @@ function onPageClick(event: MouseEvent, page: OpenPage) {
   else navigatePage(page, url);
 }
 
-ui.openSite.onclick = () => openPage(SITE, { newTab: true });
+// Switches to a tab already showing the home page, or opens one
+ui.openSite.onclick = () => {
+  const home = new URL(SITE, location.href).href;
+  const existing = [...open].find(
+    ([, file]) =>
+      isPage(file) &&
+      new URL(file.history[file.index]!, location.href).href === home
+  );
+  if (existing) activate(existing[0]);
+  else openPage(SITE, { newTab: true });
+};
 
 function openSettings() {
   if (!open.has(SETTINGS)) open.set(SETTINGS, { settings: true });
@@ -657,6 +669,24 @@ function renderTabs() {
   ui.empty.hidden = open.size > 0;
 }
 
+// A mouse wheel scrolls the tabs sideways, like VS Code
+ui.tabs.addEventListener(
+  "wheel",
+  (event) => {
+    if (event.deltaX !== 0 || event.deltaY === 0) return;
+    event.preventDefault();
+    // Firefox counts in lines, not pixels
+    const unit =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 20
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? ui.tabs.clientWidth
+          : 1;
+    ui.tabs.scrollLeft += event.deltaY * unit;
+  },
+  { passive: false }
+);
+
 /** Back, forward, reload and the address, in place of a page tab's breadcrumbs */
 function renderAddressBar(page: OpenPage) {
   const button = (text: string, title: string, onclick: () => void) => {
@@ -775,8 +805,11 @@ function updatePreview({ focus = true } = {}) {
   const file = fileAt(active);
   const markdown = !!file && isMarkdown(file);
   const show = markdown && file.preview;
-  ui.previewToggle.disabled = !markdown;
-  ui.previewToggle.classList.toggle("on", show);
+  ui.previewToggle.hidden = !markdown;
+  ui.previewToggle.classList.toggle("previewing", show);
+  ui.previewToggle.title = show
+    ? "Show source (Ctrl+Shift+V)"
+    : "Open preview (Ctrl+Shift+V)";
   ui.preview.hidden = !show;
   ui.editor.hidden = !file || show;
   if (show) {

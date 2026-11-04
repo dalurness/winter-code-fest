@@ -64,6 +64,10 @@ monaco.editor.defineTheme("wcf", {
     "editorWhitespace.foreground": "#b9d1ff",
     "editorWidget.background": "#e5f0ff",
     "editorStickyScroll.background": "#f6f9ff",
+    // Same as --scrollbar in style.css
+    "scrollbarSlider.background": "#5d7dba40",
+    "scrollbarSlider.hoverBackground": "#5d7dba66",
+    "scrollbarSlider.activeBackground": "#5d7dba99",
   },
 });
 
@@ -100,8 +104,10 @@ monaco.editor.defineTheme("wcf-dark", {
     "editorWidget.border": "#1c2636",
     "editorStickyScroll.background": "#0d121b",
     "minimap.background": "#0d121b",
-    "scrollbarSlider.background": "#4d6ba833",
-    "scrollbarSlider.hoverBackground": "#4d6ba855",
+    // Same as --scrollbar in style.css
+    "scrollbarSlider.background": "#4d6ba844",
+    "scrollbarSlider.hoverBackground": "#4d6ba866",
+    "scrollbarSlider.activeBackground": "#4d6ba899",
   },
 });
 

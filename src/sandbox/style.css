@@ -28,6 +28,9 @@
   --link: #3a4fa0;
   --code-bg: #d0e3ff;
   --hover-icon: #5d7dba26;
+  --scrollbar: #5d7dba40;
+  --scrollbar-hover: #5d7dba66;
+  --scrollbar-active: #5d7dba99;
   --ui-font: "Poppins", "Poppins Fallback", system-ui, sans-serif;
   --sidebar-width: 240px;
   --panel-height: 38%;
@@ -51,6 +54,9 @@
   --link: #8fb3ff;
   --code-bg: #162031;
   --hover-icon: #a9c4ff1c;
+  --scrollbar: #4d6ba844;
+  --scrollbar-hover: #4d6ba866;
+  --scrollbar-active: #4d6ba899;
   color-scheme: dark;
 }
 
@@ -125,6 +131,27 @@ button.icon.on {
   background: var(--hover-icon);
 }
 
+button.icon svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The Markdown button shows what it switches to */
+#preview-toggle .to-source,
+#preview-toggle.previewing .to-preview {
+  display: none;
+}
+
+#preview-toggle.previewing .to-source {
+  display: inline;
+}
+
 .spacer {
   flex: 1;
 }
@@ -172,7 +199,7 @@ button.icon.on {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--sidebar-width) 0 1fr;
+  grid-template-columns: var(--sidebar-width) 0 minmax(0, 1fr);
 }
 
 .sidebar {
@@ -202,6 +229,9 @@ button.icon.on {
 
 .main {
   display: grid;
+  /* One column as wide as the space, so a long tab bar scrolls instead of
+     widening the editor and terminal with it */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto 1fr 0 var(--panel-height);
   min-width: 0;
   min-height: 0;
@@ -341,6 +371,48 @@ button.icon.on {
   color: var(--badge, var(--muted));
 }
 
+/* Flat sliders like the editor's, with no track or arrows. Chromium ignores
+   these pseudo-elements once scrollbar-color is set, so that is only for
+   Firefox, which has no pseudo-elements. */
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar {
+  width: 10px;
+  height: 4px;
+  background: transparent;
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-active);
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .tree,
+  .tabs,
+  .preview,
+  .settings-page {
+    scrollbar-color: var(--scrollbar-hover) transparent;
+    scrollbar-width: thin;
+  }
+}
+
+/* The terminal's scrollbar stays visible instead of fading out, like the
+   editor's */
+.xterm .xterm-scrollable-element > .scrollbar.invisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* --- Tabs --- */
 
 .tabs-bar {
@@ -355,10 +427,11 @@ button.icon.on {
 
 .tabs {
   flex: 1;
+  /* Scroll instead of growing past the bar */
+  min-width: 0;
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
 }
 
 .tabs-bar > .icon {
@@ -366,6 +439,7 @@ button.icon.on {
 }
 
 .tab {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -624,7 +698,7 @@ button.icon.on {
 }
 
 .workbench.sidebar-hidden {
-  grid-template-columns: 0 0 1fr;
+  grid-template-columns: 0 0 minmax(0, 1fr);
 }
 
 .workbench.sidebar-hidden .sidebar {
@@ -853,7 +927,7 @@ button.icon.on {
 
 @media (max-width: 700px) {
   .workbench {
-    grid-template-columns: 0 0 1fr;
+    grid-template-columns: 0 0 minmax(0, 1fr);
   }
 
   .sidebar {
