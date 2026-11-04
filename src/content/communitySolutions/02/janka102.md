@@ -1,8 +1,94 @@
 ---
-descriptions: ["gleam", "ruby"]
+descriptions: ["gleam", "ruby", "go"]
 ---
 
+## 2026
+
+```go
+package main
+
+import (
+	"io"
+	"fmt"
+	"log"
+	"os"
+)
+
+func main() {
+	// file := strings.NewReader("\\33\\04\\11\\11\\14, \\48\\14\\17\\11\\03!")
+
+	// file, err := os.Open("/workspace/days/02/small_message_encoded.txt")
+	file, err := os.Open("/workspace/days/02/large_message_encoded.txt")
+	defer file.Close()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	var prev rune
+	for {
+		var item rune
+		_, err := fmt.Fscanf(file, "%c", &item)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Error scanning: %s\n", err)
+		}
+
+		if item == '\\' {
+			if prev == '\\' {
+				fmt.Print("\\")
+				prev = 0
+				continue
+			}
+
+			if prev == 0 {
+				prev = '\\'
+				continue
+			}
+
+			log.Fatalln("invalid escape")
+		}
+
+		if prev == '\\' {
+			if item >= '0' && item <= '5' {
+				prev = item
+				continue
+			}
+
+			log.Fatalln("escape out of range")
+		}
+
+		if prev >= '0' && prev <= '5' {
+			if item < '0' || item > '9' || (prev == '5' && item > '1') {
+				log.Fatalf("escape out of range, prev '%c', item '%c'\n", prev, item)
+			}
+
+			index := (prev-'0')*10 + (item - '0')
+			if index <= 25 {
+				fmt.Printf("%c", 'a'+index)
+			} else {
+				fmt.Printf("%c", 'A'+index-26)
+			}
+
+			prev = 0
+			continue
+		}
+
+		if prev == 0 {
+			fmt.Printf("%c", item)
+			continue
+		}
+
+		log.Fatalf("error state, prev '%c', item '%c'\n", prev, item)
+	}
+}
+```
+
 ## 2025
+
+<details>
+<summary>Show Ruby Solution</summary>
 
 Ruby again... I'm starting to get familiar with the docs now. I couldn't get debugging in VSCode working, so `irb` was my friend this time.
 
@@ -59,6 +145,8 @@ if __FILE__ == $PROGRAM_NAME
   challenge.solve
 end
 ```
+
+</details>
 
 ## 2024
 
