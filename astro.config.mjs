@@ -22,6 +22,8 @@ const V86_DIR = resolve("public/sandbox/v86");
 function sandboxFiles() {
   return {
     name: "sandbox-files",
+    // Before Astro's own middleware, which answers unknown files with a 404 page
+    enforce: "pre",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = decodeURIComponent((req.url ?? "").split("?")[0] ?? "");
@@ -36,8 +38,20 @@ function sandboxFiles() {
           return;
         }
         res.setHeader("Content-Type", "application/octet-stream");
-        res.setHeader("Content-Length", size);
         res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Accept-Ranges", "bytes");
+        // The page fetches single files out of a bundle, like GitHub Pages allows
+        const range = /^bytes=(\d+)-(\d+)$/.exec(req.headers.range ?? "");
+        if (range) {
+          const start = Number(range[1]);
+          const end = Math.min(Number(range[2]), size - 1);
+          res.statusCode = 206;
+          res.setHeader("Content-Range", `bytes ${start}-${end}/${size}`);
+          res.setHeader("Content-Length", end - start + 1);
+          createReadStream(file, { start, end }).pipe(res);
+          return;
+        }
+        res.setHeader("Content-Length", size);
         createReadStream(file).pipe(res);
       });
     },

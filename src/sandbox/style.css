@@ -28,6 +28,11 @@
   --link: #3a4fa0;
   --code-bg: #d0e3ff;
   --hover-icon: #5d7dba26;
+  --scrollbar: #5d7dba40;
+  --scrollbar-hover: #5d7dba66;
+  --scrollbar-active: #5d7dba99;
+  --error: #c4314b;
+  --error-bg: #fbe9ec;
   --ui-font: "Poppins", "Poppins Fallback", system-ui, sans-serif;
   --sidebar-width: 240px;
   --panel-height: 38%;
@@ -51,6 +56,11 @@
   --link: #8fb3ff;
   --code-bg: #162031;
   --hover-icon: #a9c4ff1c;
+  --scrollbar: #4d6ba844;
+  --scrollbar-hover: #4d6ba866;
+  --scrollbar-active: #4d6ba899;
+  --error: #be1100;
+  --error-bg: #5a1d1d;
   color-scheme: dark;
 }
 
@@ -116,6 +126,7 @@ button.icon {
   background: none;
   border-color: transparent;
   padding: 0 5px;
+  font-size: 16px;
   line-height: 20px;
   color: var(--text);
 }
@@ -125,8 +136,36 @@ button.icon.on {
   background: var(--hover-icon);
 }
 
+button.icon svg {
+  width: 18px;
+  height: 18px;
+  vertical-align: -4px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The Markdown button shows what it switches to */
+#preview-toggle .to-source,
+#preview-toggle.previewing .to-preview {
+  display: none;
+}
+
+#preview-toggle.previewing .to-source {
+  display: inline;
+}
+
 .spacer {
   flex: 1;
+}
+
+/* A symbol in a text button, a little larger than the text */
+.glyph {
+  font-size: 1.25em;
+  line-height: 1;
+  vertical-align: -0.1em;
 }
 
 /* --- Title bar --- */
@@ -172,7 +211,7 @@ button.icon.on {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--sidebar-width) 0 1fr;
+  grid-template-columns: var(--sidebar-width) 0 minmax(0, 1fr);
 }
 
 .sidebar {
@@ -202,12 +241,44 @@ button.icon.on {
 
 .main {
   display: grid;
-  grid-template-rows: auto auto 1fr 0 var(--panel-height);
+  /* One column as wide as the space, so a long tab bar scrolls instead of
+     widening the editor and terminal with it */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr 0 var(--panel-height);
   min-width: 0;
   min-height: 0;
 }
 
+/* Placed by row, since the hidden conflict bar leaves a gap otherwise */
+.main > .tabs-bar {
+  grid-row: 1;
+}
+.main > .breadcrumbs {
+  grid-row: 2;
+}
+.main > .conflict {
+  grid-row: 3;
+}
+.main > .editor-area {
+  grid-row: 4;
+}
+.main > .sash {
+  grid-row: 5;
+}
+.main > .panel {
+  grid-row: 6;
+}
+
 /* Drag handles, drawn as a line on hover like VS Code's sashes */
+/* Placed by column, so the hidden sidebar keeps its place in the grid */
+.workbench > .sash {
+  grid-column: 2;
+}
+
+.workbench > .main {
+  grid-column: 3;
+}
+
 .sash {
   position: relative;
   z-index: 5;
@@ -286,8 +357,81 @@ button.icon.on {
   flex: none;
   width: 16px;
   text-align: center;
+  height: 16px;
   color: var(--muted);
-  font-size: 10px;
+}
+
+.tree .twistie svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The same arrow for both, turned down when open. The tree is redrawn on each
+   click, so the folder just clicked plays the turn as an animation. */
+.tree [aria-expanded="true"] .twistie {
+  transform: rotate(90deg);
+}
+
+.tree [aria-expanded] .twistie.toggled {
+  animation: twistie-close 0.1s ease-out;
+}
+
+.tree [aria-expanded="true"] .twistie.toggled {
+  animation-name: twistie-open;
+}
+
+@keyframes twistie-open {
+  from {
+    transform: none;
+  }
+}
+
+@keyframes twistie-close {
+  from {
+    transform: rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree .twistie.toggled {
+    animation: none !important;
+  }
+}
+
+.tree .new-entry {
+  cursor: default;
+}
+
+.tree .new-entry input {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  padding: 0 3px;
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--accent);
+  outline: none;
+}
+
+.tree .new-entry.invalid input {
+  border-color: var(--error);
+}
+
+.tree .new-entry-error {
+  margin: 0 8px 2px 24px;
+  padding: 2px 6px;
+  font-size: 12px;
+  white-space: normal;
+  color: var(--text);
+  background: var(--error-bg);
+  border: 1px solid var(--error);
 }
 
 .tree .name {
@@ -331,14 +475,56 @@ button.icon.on {
 /* File type badges in the explorer and tabs */
 .badge {
   flex: none;
-  width: 16px;
+  width: 18px;
   font:
-    700 9px/1 ui-monospace,
+    700 11px/1 ui-monospace,
     Menlo,
     Consolas,
     monospace;
   text-align: center;
   color: var(--badge, var(--muted));
+}
+
+/* Flat sliders like the editor's, with no track or arrows. Chromium ignores
+   these pseudo-elements once scrollbar-color is set, so that is only for
+   Firefox, which has no pseudo-elements. */
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar {
+  width: 10px;
+  height: 4px;
+  background: transparent;
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-active);
+}
+
+:is(.tree, .tabs, .preview, .settings-page)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .tree,
+  .tabs,
+  .preview,
+  .settings-page {
+    scrollbar-color: var(--scrollbar-hover) transparent;
+    scrollbar-width: thin;
+  }
+}
+
+/* The terminal's scrollbar stays visible instead of fading out, like the
+   editor's */
+.xterm .xterm-scrollable-element > .scrollbar.invisible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* --- Tabs --- */
@@ -355,10 +541,11 @@ button.icon.on {
 
 .tabs {
   flex: 1;
+  /* Scroll instead of growing past the bar */
+  min-width: 0;
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
 }
 
 .tabs-bar > .icon {
@@ -366,6 +553,7 @@ button.icon.on {
 }
 
 .tab {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -407,6 +595,8 @@ button.icon.on {
   height: 20px;
   padding: 0;
   border: 0;
+  font-size: 16px;
+  line-height: 20px;
   background: none;
   color: inherit;
   border-radius: 4px;
@@ -433,6 +623,31 @@ button.icon.on {
 
 .tab:not(.dirty) .close::before {
   content: "×";
+}
+
+/* The VM changed the file under unsaved edits */
+.tab.conflict {
+  color: var(--error);
+}
+
+.conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 14px;
+  border-block: 1px solid var(--error);
+  background: var(--error-bg);
+  color: var(--strong);
+}
+
+.conflict[hidden] {
+  display: none;
+}
+
+.conflict span {
+  flex: 1;
+  min-width: 12em;
 }
 
 .breadcrumbs {
@@ -624,7 +839,7 @@ button.icon.on {
 }
 
 .workbench.sidebar-hidden {
-  grid-template-columns: 0 0 1fr;
+  grid-template-columns: 0 0 minmax(0, 1fr);
 }
 
 .workbench.sidebar-hidden .sidebar {
@@ -632,7 +847,7 @@ button.icon.on {
 }
 
 .main.panel-hidden {
-  grid-template-rows: auto auto 1fr 0 0;
+  grid-template-rows: auto auto auto 1fr 0 0;
 }
 
 .main.panel-hidden .panel,
@@ -840,6 +1055,11 @@ button.icon.on {
   text-decoration: none;
 }
 
+.statusbar a svg {
+  width: 14px;
+  height: 14px;
+}
+
 .statusbar a:hover {
   background: var(--hover-icon);
 }
@@ -853,7 +1073,7 @@ button.icon.on {
 
 @media (max-width: 700px) {
   .workbench {
-    grid-template-columns: 0 0 1fr;
+    grid-template-columns: 0 0 minmax(0, 1fr);
   }
 
   .sidebar {

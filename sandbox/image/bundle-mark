@@ -1,0 +1,11 @@
+#!/bin/sh
+# Appends the files added since the last call to /.bundles/<group>, so the
+# build can bundle each language's downloads together (see bundle.py).
+# build.sh takes /.bundles back out of the image.
+set -e
+cd /.bundles
+find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /.bundles \) -prune \
+  -o -type f -print | sort > .after
+touch .before
+comm -13 .before .after >> "$1"
+mv .after .before

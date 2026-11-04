@@ -23,13 +23,15 @@ const STAGING = "/.sb";
  *
  * The root is mounted cache=loose, so the guest keeps serving its cached copy
  * of a file written from here. Each write is also staged in STAGING, under a
- * name the guest has never looked up, and `sb sync`/`sb run` copy staged files
- * over their targets from inside the guest, which updates its cache. That
- * avoids dropping the whole page cache, which made every run re-read its
- * toolchain over 9p.
+ * name the guest has never looked up, and sb-agent (when `onStaged` tells it,
+ * see sync.ts) or `sb run` copy staged files over their targets from inside
+ * the guest, which updates its cache. That avoids dropping the whole page
+ * cache, which made every run re-read its toolchain over 9p.
  */
 export class FileService {
   private staged = 0;
+  /** Called after each write is staged */
+  onStaged?: (path: string) => void;
 
   constructor(private vm: Emulator) {}
 
@@ -39,6 +41,11 @@ export class FileService {
 
   exists(path: string): boolean {
     return this.fs.SearchPath(path).id !== -1;
+  }
+
+  isDir(path: string): boolean {
+    const { id } = this.fs.SearchPath(path);
+    return id !== -1 && (this.fs.GetInode(id).mode & S_IFMT) === S_IFDIR;
   }
 
   /** Directory entries, directories first. */
@@ -115,6 +122,20 @@ export class FileService {
     const name = `${STAGING}/${Date.now()}-${String(this.staged++).padStart(6, "0")}`;
     await this.vm.create_file(`${name}.data`, data);
     await this.vm.create_file(`${name}.path`, encoder.encode(path));
+    this.onStaged?.(path);
+  }
+
+  /** The inode at a path and its directory's, or -1 if there is none */
+  locate(path: string): { id: number; parentid: number } {
+    return this.fs.SearchPath(path);
+  }
+
+  /**
+   * Makes a folder and any missing parents. The guest sees new names on its
+   * next lookup, since cache=loose only keeps what it has already looked up.
+   */
+  mkdir(path: string) {
+    this.mkdirp(path);
   }
 
   /** Adds a file the guest has never seen, so it needs no staging. */

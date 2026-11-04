@@ -32,6 +32,10 @@ export const TERMINAL_THEMES: Record<"wcf" | "dark", ITheme> = {
     cursor: "#333333",
     cursorAccent: "#f6f9ff",
     selectionBackground: "#b9d1ff",
+    // Same as --scrollbar in style.css
+    scrollbarSliderBackground: "#5d7dba40",
+    scrollbarSliderHoverBackground: "#5d7dba66",
+    scrollbarSliderActiveBackground: "#5d7dba99",
     // Darker than xterm's defaults so colored output reads on a light background
     black: "#333333",
     red: "#c0303f",
@@ -50,6 +54,9 @@ export const TERMINAL_THEMES: Record<"wcf" | "dark", ITheme> = {
     cursor: "#c4cfdf",
     cursorAccent: "#0d121b",
     selectionBackground: "#2a4170",
+    scrollbarSliderBackground: "#4d6ba844",
+    scrollbarSliderHoverBackground: "#4d6ba866",
+    scrollbarSliderActiveBackground: "#4d6ba899",
     black: "#1c2636",
     red: "#f08090",
     green: "#8fd4a0",

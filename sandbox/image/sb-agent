@@ -1,0 +1,21 @@
+#!/bin/sh
+# Keeps the guest in step with the editor without anyone running `sb sync`.
+# inittab starts it at boot, so it is already running in the snapshot.
+#
+# The page sends a newline on ttyS2 after staging saves in /.sb, and this
+# applies them through the kernel (see sb) and answers "applied". Nothing runs
+# between saves: it waits in read, so it adds nothing to a run's count.
+#
+# The other way needs nothing in here: the page sees the guest's writes as
+# they reach v86's 9p server. Files are written back when closed; the shorter
+# writeback delay covers programs that keep a file open.
+# init's PATH has no /usr/local/bin, where sb is
+export PATH="/usr/local/bin:$PATH"
+sysctl -q -w vm.dirty_expire_centisecs=100 vm.dirty_writeback_centisecs=100
+
+stty -F /dev/ttyS2 raw -echo
+exec < /dev/ttyS2 > /dev/ttyS2 2>&1
+while read -r _; do
+  sb apply
+  echo applied
+done

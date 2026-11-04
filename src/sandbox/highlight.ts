@@ -1,5 +1,5 @@
-// Monarch grammars for languages Monaco does not ship: Zig, Gleam, Clank,
-// TOML, Makefile and GNU assembler. Highlighting only, no language features.
+// Monarch grammars for languages Monaco does not ship: Zig, Gleam, Erlang,
+// Clank, TOML, Makefile and GNU assembler. Highlighting only, no language features.
 import * as monaco from "monaco-editor";
 
 type Grammar = monaco.languages.IMonarchLanguage;
@@ -85,6 +85,42 @@ const gleam: Grammar = {
       [/\\./, "string.escape"],
       [/"/, "string", "@pop"],
       [/[^\\"]+/, "string"],
+    ],
+  },
+};
+
+const erlang: Grammar = {
+  // prettier-ignore
+  keywords: [
+    "after", "and", "andalso", "band", "begin", "bnot", "bor", "bsl", "bsr",
+    "bxor", "case", "catch", "cond", "div", "else", "end", "fun", "if", "let",
+    "maybe", "not", "of", "or", "orelse", "receive", "rem", "try", "when",
+    "xor",
+  ],
+  tokenizer: {
+    root: [
+      [/%.*$/, "comment"],
+      // Attributes like -module(name).
+      [/^-[a-z_]\w*/, "annotation"],
+      [/[A-Z_]\w*/, "variable"],
+      [
+        /[a-z]\w*/,
+        { cases: { "@keywords": "keyword", "@default": "identifier" } },
+      ],
+      [/'(\\.|[^\\'])*'/, "identifier"],
+      [/\?\??[A-Za-z_]\w*/, "constant"],
+      [/\$\\?./, "number"],
+      [/\d+#[\da-zA-Z]+/, "number"],
+      [/\d+(\.\d+)?([eE][+-]?\d+)?/, "number"],
+      [/"/, "string", "@string"],
+      [/[{}()[\]]/, "@brackets"],
+      [/->|<-|<=|=>|::|\|\||[=<>!+\-*/|:.]+/, "operator"],
+    ],
+    string: [
+      [/~[\d.*]*[a-zA-Z~]/, "string.escape"],
+      [/\\./, "string.escape"],
+      [/"/, "string", "@pop"],
+      [/[^\\"~]+|~/, "string"],
     ],
   },
 };
@@ -223,6 +259,7 @@ const asm: Grammar = {
 const languages: [monaco.languages.ILanguageExtensionPoint, Grammar][] = [
   [{ id: "zig", extensions: [".zig", ".zon"] }, zig],
   [{ id: "gleam", extensions: [".gleam"] }, gleam],
+  [{ id: "erlang", extensions: [".erl", ".hrl", ".escript"] }, erlang],
   [{ id: "clank", extensions: [".clk"] }, clank],
   [{ id: "toml", extensions: [".toml"], filenames: ["Cargo.lock"] }, toml],
   [
@@ -244,6 +281,7 @@ for (const [language, grammar] of languages) {
 const comments: Record<string, monaco.languages.CommentRule> = {
   zig: { lineComment: "//" },
   gleam: { lineComment: "//" },
+  erlang: { lineComment: "%" },
   clank: { lineComment: "#" },
   toml: { lineComment: "#" },
   makefile: { lineComment: "#" },

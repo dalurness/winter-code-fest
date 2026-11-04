@@ -1,8 +1,9 @@
 import { badge } from "./badges";
 import { addContent, DAYS_DIR, fetchContent } from "./content";
 import { EDITOR_THEMES, monaco } from "./editor";
-import { FileService, type Entry } from "./files";
+import { FileService, normalize, type Entry } from "./files";
 import { renderMarkdown } from "./preview";
+import { languageOf } from "./languages";
 import {
   loadSettings,
   onSystemThemeChange,
@@ -11,8 +12,14 @@ import {
   type AutoSave,
   type Settings,
 } from "./settings";
+import { GuestSync, type GuestChanges } from "./sync";
 import { SerialTerminal, TERMINAL_THEMES } from "./terminal";
-import { createVm, fetchSnapshot, InstructionCounter } from "./vm";
+import {
+  createVm,
+  fetchBundles,
+  fetchSnapshot,
+  InstructionCounter,
+} from "./vm";
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -26,6 +33,8 @@ const ui = {
   main: $("main"),
   tree: $("tree"),
   refresh: $<HTMLButtonElement>("refresh"),
+  newFile: $<HTMLButtonElement>("new-file"),
+  newFolder: $<HTMLButtonElement>("new-folder"),
   upload: $<HTMLButtonElement>("upload"),
   uploadInput: $<HTMLInputElement>("upload-input"),
   editorArea: document.querySelector<HTMLElement>(".editor-area")!,
@@ -36,6 +45,10 @@ const ui = {
   breadcrumbs: $("breadcrumbs"),
   editor: $("editor"),
   preview: $("preview"),
+  conflict: $("conflict"),
+  conflictName: $("conflict-name"),
+  keepMine: $<HTMLButtonElement>("keep-mine"),
+  useTheirs: $<HTMLButtonElement>("use-theirs"),
   empty: $("empty"),
   pages: $("pages"),
   split: $<HTMLButtonElement>("split"),
@@ -88,6 +101,7 @@ const params = new URLSearchParams(location.search);
 const started = performance.now();
 setStatus("Downloading snapshot…");
 const contentPromise = fetchContent();
+const bundlesPromise = fetchBundles();
 const snapshot = params.has("fresh") ? undefined : await fetchSnapshot();
 metrics.snapshot = !!snapshot;
 setStatus(
@@ -96,10 +110,13 @@ setStatus(
     : "Booting (no snapshot, this takes a while)…"
 );
 
-const vm = createVm(snapshot);
+const bundles = await bundlesPromise;
+const vm = createVm(snapshot, bundles);
 // Handy for poking at the emulator from devtools while developing
 if (import.meta.env.DEV) Object.assign(window, { vm });
 const files = new FileService(vm);
+const sync = new GuestSync(vm, onGuestChange);
+files.onStaged = (path) => sync.saved(path);
 const counter = new InstructionCounter(vm);
 const terms = [
   new SerialTerminal(vm, 0, $("term0"), counter),
@@ -113,7 +130,7 @@ terms.forEach((t) =>
 /** `sb` sets the guest clock (for cargo mtimes) and the terminal size. */
 function sbArgs(term: SerialTerminal) {
   const { rows, cols } = term.size;
-  return `${Math.floor(Date.now() / 1000)} ${rows} ${cols}`;
+  return `${rows} ${cols}`;
 }
 
 /** Wait for a shell prompt on the terminal, then sync clock and size. */
@@ -143,6 +160,10 @@ const editor = monaco.editor.create(ui.editor, {
   stickyScroll: { enabled: true },
   bracketPairColorization: { enabled: true },
   guides: { bracketPairs: "active" },
+  // Always shown instead of fading out when the mouse leaves
+  scrollbar: { vertical: "visible" },
+  // Dropped files are uploaded instead, see onEditorDrop
+  dropIntoEditor: { enabled: false },
 });
 
 const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
@@ -154,12 +175,21 @@ const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
 function applySettings() {
   const theme = resolveTheme(settings.theme);
   document.documentElement.dataset["theme"] = theme;
+  // The title bar of the installed app, the same color as the page's
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute(
+      "content",
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--chrome")
+        .trim()
+    );
   monaco.editor.setTheme(EDITOR_THEMES[theme]);
   terms.forEach((t) => t.setTheme(TERMINAL_THEMES[theme]));
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
     wordWrap: settings.wordWrap ? "on" : "off",
-    minimap: { enabled: settings.minimap },
+    minimap: { enabled: settings.minimap, showSlider: "always" },
     fontSize: settings.fontSize,
   });
   ui.autoSave.textContent = AUTO_SAVE_LABELS[settings.autoSave];
@@ -220,6 +250,10 @@ onSystemThemeChange(applySettings);
 interface OpenFile {
   model: monaco.editor.ITextModel;
   savedVersion: number;
+  /** The file as the VM last had it, read or saved */
+  disk: string;
+  /** The VM changed the file under unsaved edits, until one side is picked */
+  conflict: boolean;
   /** Markdown shown rendered instead of as source */
   preview: boolean;
   viewState: monaco.editor.ICodeEditorViewState | null;
@@ -270,6 +304,9 @@ const dirName = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/";
 /** Files bigger than this are not opened; Monaco struggles and 9p has to fetch them whole. */
 const MAX_OPEN_BYTES = 5e6;
 
+/** Set while a tab takes in the VM's copy of its file */
+let loadingDisk = false;
+
 async function loadFile(path: string): Promise<OpenFile | undefined> {
   const size = files.size(path);
   if (size > MAX_OPEN_BYTES) {
@@ -281,8 +318,9 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
     setStatus(`${baseName(path)} is a binary file (${mb(bytes.length)})`);
     return;
   }
+  const disk = new TextDecoder().decode(bytes);
   const model = monaco.editor.createModel(
-    new TextDecoder().decode(bytes),
+    disk,
     // Monaco picks the language from the file name
     undefined,
     monaco.Uri.file(path)
@@ -290,11 +328,15 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
   const file: OpenFile = {
     model,
     savedVersion: model.getAlternativeVersionId(),
+    disk,
+    conflict: false,
     // Markdown opens rendered, like a question on the site
     preview: ["markdown", "mdx"].includes(model.getLanguageId()),
     viewState: null,
   };
   model.onDidChangeContent(() => {
+    // The VM's copy coming in is saved already
+    if (loadingDisk) return;
     renderTabs();
     markDirtyInTree(path);
     if (settings.autoSave === "afterDelay") {
@@ -306,6 +348,9 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
 }
 
 async function openFile(path: string, { focus = true } = {}) {
+  // The language's files start downloading before the first run needs them
+  const language = languageOf(path);
+  if (language) bundles?.prefetchLanguage(language.id);
   if (!open.has(path)) {
     const file = await loadFile(path);
     if (!file) return;
@@ -456,7 +501,12 @@ function onPageClick(event: MouseEvent, page: OpenPage) {
   else navigatePage(page, url);
 }
 
-ui.openSite.onclick = () => openPage(SITE, { newTab: true });
+// Switches to a tab already showing the site, or opens one on the home page
+ui.openSite.onclick = () => {
+  const existing = [...open].find(([, file]) => isPage(file));
+  if (existing) activate(existing[0]);
+  else openPage(SITE, { newTab: true });
+};
 
 function openSettings() {
   if (!open.has(SETTINGS)) open.set(SETTINGS, { settings: true });
@@ -507,6 +557,7 @@ function activate(path: string | undefined, { focus = true } = {}) {
   updatePreview({ focus });
   updateStatusBar();
   updateRunButton();
+  renderConflict();
   renderTree();
 }
 
@@ -583,6 +634,7 @@ function renderTabs() {
       tab.title = isPage(file) ? file.url : isFile(file) ? path : "Settings";
       tab.classList.toggle("active", path === active);
       tab.classList.toggle("dirty", isDirty(file));
+      tab.classList.toggle("conflict", isFile(file) && file.conflict);
       tab.setAttribute("aria-selected", String(path === active));
 
       const name = document.createElement("span");
@@ -656,6 +708,24 @@ function renderTabs() {
   ui.tabs.querySelector(".active")?.scrollIntoView({ block: "nearest" });
   ui.empty.hidden = open.size > 0;
 }
+
+// A mouse wheel scrolls the tabs sideways, like VS Code
+ui.tabs.addEventListener(
+  "wheel",
+  (event) => {
+    if (event.deltaX !== 0 || event.deltaY === 0) return;
+    event.preventDefault();
+    // Firefox counts in lines, not pixels
+    const unit =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 20
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? ui.tabs.clientWidth
+          : 1;
+    ui.tabs.scrollLeft += event.deltaY * unit;
+  },
+  { passive: false }
+);
 
 /** Back, forward, reload and the address, in place of a page tab's breadcrumbs */
 function renderAddressBar(page: OpenPage) {
@@ -736,9 +806,22 @@ async function save(path: string) {
   const file = fileAt(path);
   if (!file || !isDirty(file)) return;
   clearTimeout(file.autoSaveTimer);
+  // Saving would overwrite the VM's change without anyone choosing to
+  if (file.conflict) {
+    setStatus(
+      `${baseName(path)} changed in the VM; keep yours or use the VM's first`
+    );
+    return;
+  }
+  await write(path, file);
+}
+
+async function write(path: string, file: OpenFile) {
   const version = file.model.getAlternativeVersionId();
-  await files.write(path, file.model.getValue());
+  const text = file.model.getValue();
+  await files.write(path, text);
   file.savedVersion = version;
+  file.disk = text;
   renderTabs();
   markDirtyInTree(path);
 }
@@ -754,19 +837,105 @@ window.addEventListener("blur", () => {
   if (settings.autoSave === "onFocusChange") void saveAll();
 });
 
-/** Pick up changes made inside the VM (new files, files edited in the terminal). */
-async function refresh() {
-  for (const [path, file] of open) {
-    if (!isFile(file) || isDirty(file) || !files.exists(path)) continue;
-    const text = await files.read(path);
-    if (text !== file.model.getValue()) {
-      file.model.setValue(text);
-      file.savedVersion = file.model.getAlternativeVersionId();
-    }
+/**
+ * Brings a tab up to date with its file in the VM. A tab with unsaved edits
+ * keeps them and asks which version to keep instead.
+ */
+async function reload(path: string, file: OpenFile) {
+  if (!files.exists(path)) return;
+  const text = await files.read(path);
+  if (text === file.disk) return;
+  file.disk = text;
+  // Read after any typing during the read
+  if (text === file.model.getValue()) {
+    markSaved(path, file);
+  } else if (isDirty(file)) {
+    file.conflict = true;
+    renderTabs();
+    renderConflict();
+    if (path !== active)
+      setStatus(`${baseName(path)} changed in the VM and has unsaved edits`);
+  } else {
+    showDisk(path, file);
   }
+}
+
+/** Puts the VM's copy of a file in its tab, as one step Ctrl+Z undoes */
+function showDisk(path: string, file: OpenFile) {
+  const { model } = file;
+  loadingDisk = true;
+  model.pushStackElement();
+  // An edit rather than setValue, so the cursor stays put
+  model.pushEditOperations(
+    [],
+    [{ range: model.getFullModelRange(), text: file.disk }],
+    () => null
+  );
+  model.pushStackElement();
+  loadingDisk = false;
+  markSaved(path, file);
+  if (path === active && !ui.preview.hidden) updatePreview({ focus: false });
+}
+
+function markSaved(path: string, file: OpenFile) {
+  clearTimeout(file.autoSaveTimer);
+  file.savedVersion = file.model.getAlternativeVersionId();
+  file.conflict = false;
+  renderTabs();
+  markDirtyInTree(path);
+  renderConflict();
+}
+
+/** Shows the choice for the active tab, if the VM changed it under edits */
+function renderConflict() {
+  const file = fileAt(active);
+  ui.conflict.hidden = !file?.conflict;
+  if (file?.conflict) ui.conflictName.textContent = baseName(active!);
+}
+
+ui.keepMine.onclick = () => {
+  const file = fileAt(active);
+  if (!file) return;
+  file.conflict = false;
+  renderConflict();
+  void write(active!, file);
+  editor.focus();
+};
+ui.useTheirs.onclick = () => {
+  const file = fileAt(active);
+  if (!file) return;
+  showDisk(active!, file);
+  editor.focus();
+};
+
+/** Re-reads every open file and redraws the explorer (the Refresh button) */
+async function refresh() {
+  for (const [path, file] of open) if (isFile(file)) await reload(path, file);
   renderTabs();
   renderTree();
-  if (!ui.preview.hidden) updatePreview({ focus: false });
+}
+
+/** Picks up what programs in the VM changed, as GuestSync reports it */
+function onGuestChange({ written, replaced, dirs }: GuestChanges) {
+  for (const [path, file] of open) {
+    // The guest has an older copy until sb-agent applies the save
+    if (!isFile(file) || sync.isApplying(path)) continue;
+    const { id, parentid } = files.locate(path);
+    if (written.has(id) || replaced.has(`${parentid}/${baseName(path)}`))
+      void reload(path, file);
+  }
+  if (!dirs.size) return;
+  const shown = new Set(
+    [...expanded, ...sections().map((s) => s.path)].map(
+      (dir) => files.locate(dir).id
+    )
+  );
+  // Not while a new file's name is being typed in it; that redraws it after
+  if (
+    [...dirs].some((id) => shown.has(id)) &&
+    !ui.tree.querySelector(".new-entry")
+  )
+    renderTree();
 }
 
 // --- Markdown preview ----------------------------------------------------
@@ -775,8 +944,11 @@ function updatePreview({ focus = true } = {}) {
   const file = fileAt(active);
   const markdown = !!file && isMarkdown(file);
   const show = markdown && file.preview;
-  ui.previewToggle.disabled = !markdown;
-  ui.previewToggle.classList.toggle("on", show);
+  ui.previewToggle.hidden = !markdown;
+  ui.previewToggle.classList.toggle("previewing", show);
+  ui.previewToggle.title = show
+    ? "Show source (Ctrl+Shift+V)"
+    : "Open preview (Ctrl+Shift+V)";
   ui.preview.hidden = !show;
   ui.editor.hidden = !file || show;
   if (show) {
@@ -926,6 +1098,13 @@ function reveal(path: string) {
   }
 }
 
+/** A folder's arrow, pointing right */
+const CHEVRON =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg>';
+
+/** The folder just opened or closed, whose arrow turns as the tree redraws */
+let toggled: string | undefined;
+
 function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
   const row = document.createElement("div");
   row.className = "row";
@@ -938,7 +1117,9 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
 
   const twistie = document.createElement("span");
   twistie.className = "twistie";
-  twistie.textContent = isOpen === undefined ? "" : isOpen ? "⌄" : "›";
+  // One arrow, which CSS turns down for open folders
+  if (isOpen !== undefined) twistie.innerHTML = CHEVRON;
+  if (entry.path === toggled) twistie.classList.add("toggled");
   const name = document.createElement("span");
   name.className = "name";
   name.textContent = entry.name;
@@ -952,7 +1133,9 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
     row.onclick = () => {
       uploadDir = entry.path;
       if (!expanded.delete(entry.path)) expanded.add(entry.path);
+      toggled = entry.path;
       renderTree();
+      toggled = undefined;
     };
   } else {
     if (entry.kind === "link") {
@@ -1059,6 +1242,143 @@ ui.collapse.onclick = () => {
   expanded = new Set(["/", "/workspace"]);
   renderTree();
 };
+
+// --- New files and folders ----------------------------------------------
+
+/** Why a new entry can't be called `name` in `dir`, if it can't */
+function newEntryError(dir: string, name: string): string | undefined {
+  if (name.startsWith("/")) return "A name can't start with /";
+  const path = normalize(`${dir}/${name}`);
+  if (!path.startsWith(`${dir === "/" ? "" : dir}/`))
+    return `That would be outside ${dir}`;
+  if (files.exists(path)) return `${baseName(path)} already exists here`;
+  for (
+    let i = path.indexOf("/", dir.length + 1);
+    i > 0;
+    i = path.indexOf("/", i + 1)
+  ) {
+    const parent = path.slice(0, i);
+    if (files.exists(parent) && !files.isDir(parent))
+      return `${baseName(parent)} is a file`;
+  }
+  return;
+}
+
+/**
+ * Asks for a name in a row at the top of `dir` in the explorer, like VS Code.
+ * Enter makes it, Escape cancels, and a name with slashes makes the folders
+ * in it too.
+ */
+function newEntry(kind: "file" | "dir", dir = uploadDir) {
+  if (!ready) {
+    setStatus("Wait for the VM to start before adding files");
+    return;
+  }
+  if (!files.isDir(dir)) dir = "/workspace";
+  showSidebar(true);
+  reveal(`${dir}/`);
+  expanded.add(dir);
+  renderTree();
+
+  const parent = ui.tree.querySelector<HTMLElement>(
+    `.row[data-dir="${CSS.escape(dir)}"]`
+  )!;
+  const depth = (parseInt(parent.style.paddingLeft) - 4) / 8 + 1;
+  let group = parent.parentElement!.querySelector<HTMLElement>(":scope > ul");
+  if (!group) {
+    group = renderDir(dir, depth);
+    parent.after(group);
+  }
+
+  const li = document.createElement("li");
+  const entryRow = document.createElement("div");
+  entryRow.className = "row new-entry";
+  entryRow.style.paddingLeft = `${4 + depth * 8}px`;
+  const twistie = document.createElement("span");
+  twistie.className = "twistie";
+  if (kind === "dir") twistie.innerHTML = CHEVRON;
+  let icon = kind === "dir" ? undefined : badge("");
+  const input = document.createElement("input");
+  input.spellcheck = false;
+  input.ariaLabel = kind === "dir" ? "Folder name" : "File name";
+  const message = document.createElement("div");
+  message.className = "new-entry-error";
+  message.hidden = true;
+  entryRow.append(twistie, ...(icon ? [icon] : []), input);
+  li.append(entryRow, message);
+  group.prepend(li);
+  input.focus();
+
+  const check = () => {
+    const error = input.value && newEntryError(dir, input.value);
+    message.textContent = error || "";
+    message.hidden = !error;
+    entryRow.classList.toggle("invalid", !!error);
+    return !error;
+  };
+  let done = false;
+  const finish = async (create: boolean) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    if (!create || !name || !check()) {
+      renderTree();
+      return;
+    }
+    const path = normalize(`${dir}/${name}`);
+    // A trailing slash makes a folder, as in VS Code
+    if (kind === "dir" || name.endsWith("/")) {
+      files.mkdir(path);
+      expanded.add(path);
+      uploadDir = path;
+      reveal(`${path}/`);
+      renderTree();
+      setStatus(`Made ${path}`);
+    } else {
+      await files.write(path, "");
+      uploadDir = dirName(path);
+      reveal(path);
+      renderTree();
+      await openFile(path);
+    }
+  };
+
+  input.oninput = () => {
+    check();
+    if (icon) {
+      const next = badge(baseName(input.value) || "");
+      icon.replaceWith(next);
+      icon = next;
+    }
+  };
+  input.onkeydown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (check()) void finish(true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      void finish(false);
+    }
+  };
+  input.onblur = () => void finish(true);
+}
+
+ui.tree.addEventListener("contextmenu", (event) => {
+  const row = (event.target as Element).closest<HTMLElement>(".row[data-path]");
+  if (!row) return;
+  event.preventDefault();
+  const dir = row.dataset["dir"] ?? dirName(row.dataset["path"]!);
+  showMenu(
+    [
+      ["New File…", () => newEntry("file", dir)],
+      ["New Folder…", () => newEntry("dir", dir)],
+    ],
+    event
+  );
+});
+
+ui.newFile.onclick = () => newEntry("file");
+ui.newFolder.onclick = () => newEntry("dir");
 
 // --- Upload and drop files -----------------------------------------------
 
@@ -1192,6 +1512,7 @@ ui.tree.addEventListener("drop", async (event) => {
 function onEditorDragOver(event: DragEvent) {
   if (!isFileDrag(event)) return;
   event.preventDefault();
+  event.stopPropagation();
   event.dataTransfer!.dropEffect = "copy";
   ui.editorArea.classList.add("drop-target");
 }
@@ -1199,6 +1520,7 @@ function onEditorDragOver(event: DragEvent) {
 async function onEditorDrop(event: DragEvent) {
   if (!isFileDrag(event)) return;
   event.preventDefault();
+  event.stopPropagation();
   clearDropTargets();
   const dir = fileAt(active) ? dirName(active!) : uploadDir;
   const paths = await upload(await droppedFiles(event.dataTransfer!), dir);
@@ -1206,12 +1528,15 @@ async function onEditorDrop(event: DragEvent) {
   for (const path of paths.slice(0, 10)) await openFile(path);
 }
 
-ui.editorArea.addEventListener("dragover", onEditorDragOver);
-ui.editorArea.addEventListener("drop", onEditorDrop);
+// Captured, so Monaco and the terminal never get the drop first
+ui.editorArea.addEventListener("dragover", onEditorDragOver, { capture: true });
+ui.editorArea.addEventListener("drop", onEditorDrop, { capture: true });
 
-// Anywhere else, keep the browser from opening the file in place of the page
+// Anywhere else, keep the browser from opening the file in place of the page.
+// This runs after the drop targets' own handlers, so it leaves the ones they
+// accepted alone: the last dropEffect set is the one the browser uses.
 window.addEventListener("dragover", (event) => {
-  if (!isFileDrag(event)) return;
+  if (!isFileDrag(event) || event.defaultPrevented) return;
   event.preventDefault();
   event.dataTransfer!.dropEffect = "none";
 });
@@ -1395,7 +1720,8 @@ sash($("sash-panel"), (event) => {
 // --- Run -----------------------------------------------------------------
 
 /** Files `sb run` knows how to run, besides anything in a starter project */
-const RUNNABLE = /\.(ts|js|mjs|rb|go|rs|c|s|S|zig|exs|ex|sh|gleam|clk)$/;
+const RUNNABLE =
+  /\.(ts|js|mjs|rb|py|go|rs|c|s|S|zig|exs|ex|sh|gleam|clk|cpp|cc|cxx|erl|lua|php|pl)$/;
 const STARTER = /^\/workspace\/(?!days\/)[^/]+\//;
 let running = false;
 /** Set once the first shell prompt is up */
@@ -1519,9 +1845,11 @@ function cycleTab(step: number) {
 }
 
 /**
- * VS Code's shortcuts, where the browser lets a page have them (it keeps
- * Ctrl+W, Ctrl+Tab and Ctrl+PageUp/PageDown). Handled in the capture phase so
- * they work from the editor and the terminals too, as in VS Code.
+ * VS Code's shortcuts, where the browser lets a page have them. A browser tab
+ * keeps Ctrl+W, Ctrl+Tab and Ctrl+PageUp/PageDown, but an installed app's
+ * window passes Ctrl+W on, so it closes the editor tab there as in VS Code.
+ * Handled in the capture phase so they work from the editor and the terminals
+ * too, as in VS Code.
  */
 function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
   const ctrl = event.ctrlKey || event.metaKey;
@@ -1545,7 +1873,8 @@ function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
     if (code === "KeyE" && shift) return focusExplorer;
     if (code === "KeyV" && shift) return () => togglePreview();
     if (code === "Comma") return openSettings;
-    if (code === "F4") return () => active && closeFiles([active]);
+    if ((code === "KeyW" && !shift) || code === "F4")
+      return () => active && closeFiles([active]);
   }
   if (alt && !ctrl && !shift) {
     if (code === "KeyW") return () => active && closeFiles([active]);
@@ -1573,9 +1902,12 @@ function onShortcutKey(event: KeyboardEvent) {
   void action();
 }
 window.addEventListener("keydown", onShortcutKey, { capture: true });
-window.addEventListener("focus", () => !running && refresh());
+// Closing loses the VM, not just unsaved edits, so always ask. Browsers only
+// ask once the page has been clicked or typed in.
 window.addEventListener("beforeunload", (event) => {
-  if ([...open.values()].some(isDirty)) event.preventDefault();
+  event.preventDefault();
+  // Older browsers ask only when this is set
+  event.returnValue = "";
 });
 
 // --- Start ---------------------------------------------------------------
@@ -1613,6 +1945,13 @@ if (!(await openFromParams(params))) await openFile("/workspace/README.md");
 ui.empty.textContent =
   "Open a file from the explorer, or press Ctrl+P to find one.";
 
-for (const el of [ui.refresh, ui.reset, ui.split, ui.upload])
+for (const el of [
+  ui.refresh,
+  ui.reset,
+  ui.split,
+  ui.upload,
+  ui.newFile,
+  ui.newFolder,
+])
   el.disabled = false;
 updateRunButton();

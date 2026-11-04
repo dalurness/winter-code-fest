@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Parallel version of v86's tools/copy-to-sha256.py --zstd.
 
 Writes every regular file in a tar as <sha256[:10]>.bin.zst, the names

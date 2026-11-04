@@ -18,7 +18,7 @@ const SHORTCUTS = [
   ["Ctrl+B", "Show or hide the explorer"],
   ["Ctrl+Shift+E", "Focus the explorer"],
   ["Ctrl+Shift+V", "Toggle Markdown preview"],
-  ["Alt+W, Ctrl+F4", "Close the tab"],
+  ["Alt+W, Ctrl+F4", "Close the tab (also Ctrl+W, once installed as an app)"],
   ["Alt+1…9", "Go to tab"],
   ["Ctrl+,", "Settings"],
 ];
@@ -51,6 +51,10 @@ const SHORTCUTS = [
         document.documentElement.dataset.theme = theme;
       }
     </script>
+    <link rel="manifest" href={BASE_URL + "sandbox/manifest.webmanifest"} />
+    <!-- The installed app's title bar; main.ts sets it for the picked theme -->
+    <meta name="theme-color" content="#090d14" />
+    <link rel="apple-touch-icon" href={BASE_URL + "sandbox/icons/192.png"} />
     <link
       rel="shortcut icon"
       href={BASE_URL + "favicon.ico"}
@@ -83,7 +87,7 @@ const SHORTCUTS = [
         disabled
         title="Run several times and count the VM's instructions (Ctrl+Shift+Enter)"
       >
-        ⏱ Benchmark
+        <span class="glyph">⏱</span> Benchmark
       </button>
       <span class="spacer"></span>
       <button id="reset" disabled title="Restore the VM snapshot">
@@ -97,6 +101,31 @@ const SHORTCUTS = [
         <div class="pane-title">
           Explorer
           <span class="actions">
+            <button
+              id="new-file"
+              class="icon"
+              disabled
+              title="New file in the selected folder"
+            >
+              <!-- A page with a plus -->
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M9 14.5H3.5v-13h6l3 3V8 M9.5 1.5v3h3" />
+                <path d="M12.5 10v5 M10 12.5h5" />
+              </svg>
+            </button>
+            <button
+              id="new-folder"
+              class="icon"
+              disabled
+              title="New folder in the selected folder"
+            >
+              <!-- A folder with a plus -->
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M9 13.5H1.5v-10h4.5l1.5 1.5h7v4 M12.5 10v5 M10 12.5h5"
+                />
+              </svg>
+            </button>
             <button
               id="refresh"
               class="icon"
@@ -128,16 +157,43 @@ const SHORTCUTS = [
           <button
             id="open-site"
             class="icon"
-            title="Open the Winter Code Fest site in a new tab">⌂</button
+            title="Open the Winter Code Fest site">⌂</button
           >
           <button
             id="preview-toggle"
             class="icon"
-            disabled
-            title="Toggle Markdown preview (Ctrl+Shift+V)">◫</button
+            hidden
+            title="Open preview (Ctrl+Shift+V)"
           >
+            <!-- A page with a magnifying glass: open the preview -->
+            <svg class="to-preview" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="1.5" y="2.5" width="13" height="11" rx="1" />
+              <circle cx="7.5" cy="7.5" r="2.5" />
+              <path d="m9.3 9.3 2.7 2.7" />
+            </svg>
+            <!-- A page with an arrow curling back: show the source -->
+            <svg class="to-source" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3.5 1.5h6l3 3v10h-9z M9.5 1.5v3h3" />
+              <path d="M10 12V10.5A2 2 0 0 0 8 8.5H6 M7.5 7 6 8.5 7.5 10" />
+            </svg>
+          </button>
         </div>
         <div id="breadcrumbs" class="breadcrumbs"></div>
+        <div id="conflict" class="conflict" role="alert" hidden>
+          <span
+            ><strong id="conflict-name"></strong> changed in the VM while you had
+            unsaved edits.</span
+          >
+          <button
+            id="keep-mine"
+            title="Save your edits over the file in the VM">Keep mine</button
+          >
+          <button
+            id="use-theirs"
+            title="Show the VM's file instead; Ctrl+Z brings your edits back"
+            >Use the VM's</button
+          >
+        </div>
         <div class="editor-area">
           <section id="editor" class="editor"></section>
           <article id="preview" class="preview" hidden></article>
