@@ -1716,9 +1716,11 @@ function cycleTab(step: number) {
 }
 
 /**
- * VS Code's shortcuts, where the browser lets a page have them (it keeps
- * Ctrl+W, Ctrl+Tab and Ctrl+PageUp/PageDown). Handled in the capture phase so
- * they work from the editor and the terminals too, as in VS Code.
+ * VS Code's shortcuts, where the browser lets a page have them. A browser tab
+ * keeps Ctrl+W, Ctrl+Tab and Ctrl+PageUp/PageDown, but an installed app's
+ * window passes Ctrl+W on, so it closes the editor tab there as in VS Code.
+ * Handled in the capture phase so they work from the editor and the terminals
+ * too, as in VS Code.
  */
 function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
   const ctrl = event.ctrlKey || event.metaKey;
@@ -1742,7 +1744,8 @@ function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
     if (code === "KeyE" && shift) return focusExplorer;
     if (code === "KeyV" && shift) return () => togglePreview();
     if (code === "Comma") return openSettings;
-    if (code === "F4") return () => active && closeFiles([active]);
+    if ((code === "KeyW" && !shift) || code === "F4")
+      return () => active && closeFiles([active]);
   }
   if (alt && !ctrl && !shift) {
     if (code === "KeyW") return () => active && closeFiles([active]);
