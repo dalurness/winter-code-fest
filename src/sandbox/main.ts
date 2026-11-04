@@ -469,14 +469,9 @@ function onPageClick(event: MouseEvent, page: OpenPage) {
   else navigatePage(page, url);
 }
 
-// Switches to a tab already showing the home page, or opens one
+// Switches to a tab already showing the site, or opens one on the home page
 ui.openSite.onclick = () => {
-  const home = new URL(SITE, location.href).href;
-  const existing = [...open].find(
-    ([, file]) =>
-      isPage(file) &&
-      new URL(file.history[file.index]!, location.href).href === home
-  );
+  const existing = [...open].find(([, file]) => isPage(file));
   if (existing) activate(existing[0]);
   else openPage(SITE, { newTab: true });
 };
