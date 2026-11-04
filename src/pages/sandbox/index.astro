@@ -179,6 +179,21 @@ const SHORTCUTS = [
           </button>
         </div>
         <div id="breadcrumbs" class="breadcrumbs"></div>
+        <div id="conflict" class="conflict" role="alert" hidden>
+          <span
+            ><strong id="conflict-name"></strong> changed in the VM while you had
+            unsaved edits.</span
+          >
+          <button
+            id="keep-mine"
+            title="Save your edits over the file in the VM">Keep mine</button
+          >
+          <button
+            id="use-theirs"
+            title="Show the VM's file instead; Ctrl+Z brings your edits back"
+            >Use the VM's</button
+          >
+        </div>
         <div class="editor-area">
           <section id="editor" class="editor"></section>
           <article id="preview" class="preview" hidden></article>

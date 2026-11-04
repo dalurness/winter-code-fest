@@ -244,9 +244,29 @@ button.icon svg {
   /* One column as wide as the space, so a long tab bar scrolls instead of
      widening the editor and terminal with it */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto 1fr 0 var(--panel-height);
+  grid-template-rows: auto auto auto 1fr 0 var(--panel-height);
   min-width: 0;
   min-height: 0;
+}
+
+/* Placed by row, since the hidden conflict bar leaves a gap otherwise */
+.main > .tabs-bar {
+  grid-row: 1;
+}
+.main > .breadcrumbs {
+  grid-row: 2;
+}
+.main > .conflict {
+  grid-row: 3;
+}
+.main > .editor-area {
+  grid-row: 4;
+}
+.main > .sash {
+  grid-row: 5;
+}
+.main > .panel {
+  grid-row: 6;
 }
 
 /* Drag handles, drawn as a line on hover like VS Code's sashes */
@@ -605,6 +625,31 @@ button.icon svg {
   content: "×";
 }
 
+/* The VM changed the file under unsaved edits */
+.tab.conflict {
+  color: var(--error);
+}
+
+.conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 14px;
+  border-block: 1px solid var(--error);
+  background: var(--error-bg);
+  color: var(--strong);
+}
+
+.conflict[hidden] {
+  display: none;
+}
+
+.conflict span {
+  flex: 1;
+  min-width: 12em;
+}
+
 .breadcrumbs {
   height: 22px;
   padding: 0 14px;
@@ -802,7 +847,7 @@ button.icon svg {
 }
 
 .main.panel-hidden {
-  grid-template-rows: auto auto 1fr 0 0;
+  grid-template-rows: auto auto auto 1fr 0 0;
 }
 
 .main.panel-hidden .panel,

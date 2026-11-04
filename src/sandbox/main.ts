@@ -45,6 +45,10 @@ const ui = {
   breadcrumbs: $("breadcrumbs"),
   editor: $("editor"),
   preview: $("preview"),
+  conflict: $("conflict"),
+  conflictName: $("conflict-name"),
+  keepMine: $<HTMLButtonElement>("keep-mine"),
+  useTheirs: $<HTMLButtonElement>("use-theirs"),
   empty: $("empty"),
   pages: $("pages"),
   split: $<HTMLButtonElement>("split"),
@@ -246,6 +250,10 @@ onSystemThemeChange(applySettings);
 interface OpenFile {
   model: monaco.editor.ITextModel;
   savedVersion: number;
+  /** The file as the VM last had it, read or saved */
+  disk: string;
+  /** The VM changed the file under unsaved edits, until one side is picked */
+  conflict: boolean;
   /** Markdown shown rendered instead of as source */
   preview: boolean;
   viewState: monaco.editor.ICodeEditorViewState | null;
@@ -296,6 +304,9 @@ const dirName = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/";
 /** Files bigger than this are not opened; Monaco struggles and 9p has to fetch them whole. */
 const MAX_OPEN_BYTES = 5e6;
 
+/** Set while a tab takes in the VM's copy of its file */
+let loadingDisk = false;
+
 async function loadFile(path: string): Promise<OpenFile | undefined> {
   const size = files.size(path);
   if (size > MAX_OPEN_BYTES) {
@@ -307,8 +318,9 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
     setStatus(`${baseName(path)} is a binary file (${mb(bytes.length)})`);
     return;
   }
+  const disk = new TextDecoder().decode(bytes);
   const model = monaco.editor.createModel(
-    new TextDecoder().decode(bytes),
+    disk,
     // Monaco picks the language from the file name
     undefined,
     monaco.Uri.file(path)
@@ -316,11 +328,15 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
   const file: OpenFile = {
     model,
     savedVersion: model.getAlternativeVersionId(),
+    disk,
+    conflict: false,
     // Markdown opens rendered, like a question on the site
     preview: ["markdown", "mdx"].includes(model.getLanguageId()),
     viewState: null,
   };
   model.onDidChangeContent(() => {
+    // The VM's copy coming in is saved already
+    if (loadingDisk) return;
     renderTabs();
     markDirtyInTree(path);
     if (settings.autoSave === "afterDelay") {
@@ -541,6 +557,7 @@ function activate(path: string | undefined, { focus = true } = {}) {
   updatePreview({ focus });
   updateStatusBar();
   updateRunButton();
+  renderConflict();
   renderTree();
 }
 
@@ -617,6 +634,7 @@ function renderTabs() {
       tab.title = isPage(file) ? file.url : isFile(file) ? path : "Settings";
       tab.classList.toggle("active", path === active);
       tab.classList.toggle("dirty", isDirty(file));
+      tab.classList.toggle("conflict", isFile(file) && file.conflict);
       tab.setAttribute("aria-selected", String(path === active));
 
       const name = document.createElement("span");
@@ -788,9 +806,22 @@ async function save(path: string) {
   const file = fileAt(path);
   if (!file || !isDirty(file)) return;
   clearTimeout(file.autoSaveTimer);
+  // Saving would overwrite the VM's change without anyone choosing to
+  if (file.conflict) {
+    setStatus(
+      `${baseName(path)} changed in the VM; keep yours or use the VM's first`
+    );
+    return;
+  }
+  await write(path, file);
+}
+
+async function write(path: string, file: OpenFile) {
   const version = file.model.getAlternativeVersionId();
-  await files.write(path, file.model.getValue());
+  const text = file.model.getValue();
+  await files.write(path, text);
   file.savedVersion = version;
+  file.disk = text;
   renderTabs();
   markDirtyInTree(path);
 }
@@ -806,21 +837,76 @@ window.addEventListener("blur", () => {
   if (settings.autoSave === "onFocusChange") void saveAll();
 });
 
-/** Loads a file's tab again from the VM, unless it has unsaved edits */
+/**
+ * Brings a tab up to date with its file in the VM. A tab with unsaved edits
+ * keeps them and asks which version to keep instead.
+ */
 async function reload(path: string, file: OpenFile) {
-  if (isDirty(file) || !files.exists(path)) return;
+  if (!files.exists(path)) return;
   const text = await files.read(path);
-  // Typed into while it was read, or already the same
-  if (isDirty(file) || text === file.model.getValue()) return;
-  // An edit rather than setValue, so the cursor stays put and Ctrl+Z undoes it
-  file.model.pushEditOperations(
+  if (text === file.disk) return;
+  file.disk = text;
+  // Read after any typing during the read
+  if (text === file.model.getValue()) {
+    markSaved(path, file);
+  } else if (isDirty(file)) {
+    file.conflict = true;
+    renderTabs();
+    renderConflict();
+    if (path !== active)
+      setStatus(`${baseName(path)} changed in the VM and has unsaved edits`);
+  } else {
+    showDisk(path, file);
+  }
+}
+
+/** Puts the VM's copy of a file in its tab, as one step Ctrl+Z undoes */
+function showDisk(path: string, file: OpenFile) {
+  const { model } = file;
+  loadingDisk = true;
+  model.pushStackElement();
+  // An edit rather than setValue, so the cursor stays put
+  model.pushEditOperations(
     [],
-    [{ range: file.model.getFullModelRange(), text }],
+    [{ range: model.getFullModelRange(), text: file.disk }],
     () => null
   );
-  file.savedVersion = file.model.getAlternativeVersionId();
+  model.pushStackElement();
+  loadingDisk = false;
+  markSaved(path, file);
   if (path === active && !ui.preview.hidden) updatePreview({ focus: false });
 }
+
+function markSaved(path: string, file: OpenFile) {
+  clearTimeout(file.autoSaveTimer);
+  file.savedVersion = file.model.getAlternativeVersionId();
+  file.conflict = false;
+  renderTabs();
+  markDirtyInTree(path);
+  renderConflict();
+}
+
+/** Shows the choice for the active tab, if the VM changed it under edits */
+function renderConflict() {
+  const file = fileAt(active);
+  ui.conflict.hidden = !file?.conflict;
+  if (file?.conflict) ui.conflictName.textContent = baseName(active!);
+}
+
+ui.keepMine.onclick = () => {
+  const file = fileAt(active);
+  if (!file) return;
+  file.conflict = false;
+  renderConflict();
+  void write(active!, file);
+  editor.focus();
+};
+ui.useTheirs.onclick = () => {
+  const file = fileAt(active);
+  if (!file) return;
+  showDisk(active!, file);
+  editor.focus();
+};
 
 /** Re-reads every open file and redraws the explorer (the Refresh button) */
 async function refresh() {
@@ -1816,8 +1902,12 @@ function onShortcutKey(event: KeyboardEvent) {
   void action();
 }
 window.addEventListener("keydown", onShortcutKey, { capture: true });
+// Closing loses the VM, not just unsaved edits, so always ask. Browsers only
+// ask once the page has been clicked or typed in.
 window.addEventListener("beforeunload", (event) => {
-  if ([...open.values()].some(isDirty)) event.preventDefault();
+  event.preventDefault();
+  // Older browsers ask only when this is set
+  event.returnValue = "";
 });
 
 // --- Start ---------------------------------------------------------------
