@@ -42,7 +42,7 @@ func doTheThing(filename string) {
 				i += 1
 				continue
 			}
-			
+
 			if i+3 < sl {
 				 num, err := strconv.Atoi(string(s[i+1:i+3]))
 				 if err != nil {
@@ -63,6 +63,7 @@ func doTheThing(filename string) {
 	fmt.Println(decoded)
 }
 ```
+
 </details>
 
 ## 2025 Solution Zig
