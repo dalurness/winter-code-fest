@@ -967,6 +967,10 @@ function reveal(path: string) {
   }
 }
 
+/** A folder's arrow, pointing right */
+const CHEVRON =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg>';
+
 /** The folder just opened or closed, whose arrow turns as the tree redraws */
 let toggled: string | undefined;
 
@@ -983,7 +987,7 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
   const twistie = document.createElement("span");
   twistie.className = "twistie";
   // One arrow, which CSS turns down for open folders
-  twistie.textContent = isOpen === undefined ? "" : "›";
+  if (isOpen !== undefined) twistie.innerHTML = CHEVRON;
   if (entry.path === toggled) twistie.classList.add("toggled");
   const name = document.createElement("span");
   name.className = "name";
@@ -1161,7 +1165,7 @@ function newEntry(kind: "file" | "dir", dir = uploadDir) {
   entryRow.style.paddingLeft = `${4 + depth * 8}px`;
   const twistie = document.createElement("span");
   twistie.className = "twistie";
-  twistie.textContent = kind === "dir" ? "›" : "";
+  if (kind === "dir") twistie.innerHTML = CHEVRON;
   let icon = kind === "dir" ? undefined : badge("");
   const input = document.createElement("input");
   input.spellcheck = false;
