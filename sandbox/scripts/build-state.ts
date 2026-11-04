@@ -83,7 +83,7 @@ for (const lang of LANGUAGES) {
 // loose file like a solution, so the snapshot keeps it.
 {
   const { ms } = await run(
-    "cp /workspace/zig/src/main.zig /tmp/warm.zig && sb run '' '' '' /tmp/warm.zig; rm -rf /tmp/warm.zig /tmp/sb-bin"
+    "cp /workspace/zig/src/main.zig /tmp/warm.zig && sb run '' '' /tmp/warm.zig; rm -rf /tmp/warm.zig /tmp/sb-bin"
   );
   console.log(`zig   loose  wall=${(ms / 1000).toFixed(1)}s`);
 }

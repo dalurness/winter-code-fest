@@ -113,7 +113,7 @@ terms.forEach((t) =>
 /** `sb` sets the guest clock (for cargo mtimes) and the terminal size. */
 function sbArgs(term: SerialTerminal) {
   const { rows, cols } = term.size;
-  return `${Math.floor(Date.now() / 1000)} ${rows} ${cols}`;
+  return `${rows} ${cols}`;
 }
 
 /** Wait for a shell prompt on the terminal, then sync clock and size. */

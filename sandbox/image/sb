@@ -1,9 +1,9 @@
 #!/bin/sh
 # Helper the web UI types into the terminal.
 #
-#   sb sync  [EPOCH ROWS COLS]          apply saved files, set the clock and terminal size
-#   sb run   [EPOCH ROWS COLS [FILE]]   same, then run FILE (or ./run.sh) and time it
-#   sb bench EPOCH ROWS COLS FILE [N]   same, then run it N more times with no output
+#   sb sync  [ROWS COLS]          apply saved files, set the clock and terminal size
+#   sb run   [ROWS COLS [FILE]]   same, then run FILE (or ./run.sh) and time it
+#   sb bench ROWS COLS FILE [N]   same, then run it N more times with no output
 #   sb exec  PROGRAM [ARGS]             mark where measuring starts, then run PROGRAM
 #
 # SB_CALIBRATE=1 makes run measure background work first, as bench always does.
@@ -12,9 +12,11 @@
 # editor writes from JS. The editor also stages each save in /.sb, and copying
 # it over the target from in here updates the guest's cache.
 #
-# The clock matters because cargo and the C template compare mtimes. After
-# restoring a snapshot the guest clock is wherever it was when the snapshot
-# was taken.
+# The clock matters because cargo and the C template compare mtimes with the
+# editor's saves, which have the browser's time. After restoring a snapshot,
+# or while the tab was hidden and the emulator paused, the kernel's clock is
+# behind. v86's emulated RTC follows the browser's clock throughout, so this
+# reads it again.
 #
 # The page counts the guest's instructions between the markers below. They are
 # escape sequences that xterm ignores, and the page reads v86's counter the
@@ -23,7 +25,21 @@
 # running something marks its start and then execs it, so the empty baseline
 # below costs the same overhead. Markers go to the terminal itself, so they
 # still arrive when output is redirected.
-mark() { printf '\033]7771;%s\007' "$1" 2>/dev/null > /dev/tty; }
+#
+# A run's time also starts at the last start marker, after any build. The
+# guest has no clock finer than /proc/uptime's centiseconds.
+mark() {
+  # Before the marker, so reading the time is not counted as the program's
+  if [ "$1" = start ]; then uptime_cs > /tmp/sb-start; fi
+  printf '\033]7771;%s\007' "$1" 2>/dev/null > /dev/tty
+}
+
+# busybox date has no %N, so time with /proc/uptime (centiseconds)
+uptime_cs() { cut -d' ' -f1 /proc/uptime | tr -d .; }
+
+# Says what is about to happen, dimmed, so a long build or a first run that
+# downloads a toolchain is not a blank terminal
+say() { printf '\033[2m%s\033[0m\n' "$*"; }
 
 if [ "$1" = exec ]; then
   shift
@@ -32,10 +48,10 @@ if [ "$1" = exec ]; then
 fi
 
 cmd=$1
-[ -n "$2" ] && date -s "@$2" >/dev/null
-[ -n "$4" ] && stty rows "$3" cols "$4"
-file=$5
-runs=${6:-3}
+hwclock -s -u
+[ -n "$3" ] && stty rows "$2" cols "$3"
+file=$4
+runs=${5:-3}
 
 for staged in /.sb/*.path; do
   [ -e "$staged" ] || continue
@@ -55,6 +71,7 @@ run_file() {
   project=$dir
   while [ "$project" != / ] && [ "$project" != /workspace ]; do
     if [ -x "$project/run.sh" ]; then
+      say "Running ${project#/workspace/}/run.sh…"
       cd "$project" && ./run.sh
       return
     fi
@@ -70,31 +87,32 @@ run_file() {
   bin=/tmp/sb-bin/$(printf %s "$file" | cksum | cut -d' ' -f1)
   mkdir -p /tmp/sb-bin
   case "$file" in
-    *.ts | *.js | *.mjs) mark start; exec node "$file" ;;
-    *.rb) mark start; exec ruby "$file" ;;
-    *.py) mark start; exec python "$file" ;;
-    *.go) built || go build -o "$bin" "$file" || return; mark start; exec "$bin" ;;
-    *.rs) built || rustc -O -o "$bin" "$file" || return; mark start; exec "$bin" ;;
-    *.c) built || cc -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
-    *.cpp | *.cc | *.cxx) built || g++ -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
-    *.s | *.S) built || cc -no-pie -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.ts | *.js | *.mjs) interpret node "$file" ;;
+    *.rb) interpret ruby "$file" ;;
+    *.py) interpret python "$file" ;;
+    *.go) compile go build -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.rs) compile rustc -O -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.c) compile cc -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.cpp | *.cc | *.cxx) compile g++ -O1 -Wall -o "$bin" "$file" || return; mark start; exec "$bin" ;;
+    *.s | *.S) compile cc -no-pie -o "$bin" "$file" || return; mark start; exec "$bin" ;;
     *.zig)
       # Same CPU as the template, so the image's warm cache applies
-      built || zig build-exe -mcpu=baseline --cache-dir /tmp/zig-cache -femit-bin="$bin" "$file" ||
+      compile zig build-exe -mcpu=baseline --cache-dir /tmp/zig-cache -femit-bin="$bin" "$file" ||
         return
       mark start
       exec "$bin"
       ;;
-    *.exs | *.ex) mark start; exec elixir "$file" ;;
-    *.erl) mark start; exec escript "$file" ;;
-    *.lua) mark start; exec lua "$file" ;;
-    *.php) mark start; exec php "$file" ;;
-    *.pl) mark start; exec perl "$file" ;;
-    *.sh) mark start; exec bash "$file" ;;
-    *.clk) mark start; exec clank run "$file" ;;
+    *.exs | *.ex) interpret elixir "$file" ;;
+    *.erl) interpret escript "$file" ;;
+    *.lua) interpret lua "$file" ;;
+    *.php) interpret php "$file" ;;
+    *.pl) interpret perl "$file" ;;
+    *.sh) interpret bash "$file" ;;
+    *.clk) interpret clank run "$file" ;;
     *.gleam)
       # Gleam needs a project; reuse the template's, with its build cache.
       # Input files from this folder are linked in, for relative paths.
+      say "Building and running $(basename "$file") with gleam…"
       rm -rf /tmp/sb-gleam && cp -r /workspace/gleam /tmp/sb-gleam &&
         cp "$file" /tmp/sb-gleam/src/sandbox.gleam || return
       for input in "$PWD"/*; do
@@ -108,17 +126,32 @@ run_file() {
 
 built() { [ "$bin" -nt "$file" ]; }
 
-# busybox date has no %N, so time with /proc/uptime (centiseconds)
-uptime_cs() { cut -d' ' -f1 /proc/uptime | tr -d .; }
+# Builds $bin with a compiler command, unless it is newer than $file
+compile() {
+  built && return
+  say "Compiling $(basename "$file") with $1…"
+  "$@"
+}
 
-# Runs once, marked, and sets $status and $cs
-run_once() {
-  start=$(uptime_cs)
+interpret() {
+  say "Running $(basename "$file") with $1…"
   mark start
-  if [ -n "$file" ]; then (run_file "$file"); else ./run.sh; fi
+  exec "$@"
+}
+
+# Runs once, marked, and sets $status and $cs, the time since the program
+# itself started
+run_once() {
+  mark start
+  if [ -n "$file" ]; then
+    (run_file "$file")
+  else
+    say "Running ./run.sh…"
+    ./run.sh
+  fi
   status=$?
   mark end
-  cs=$(($(uptime_cs) - start))
+  cs=$(($(uptime_cs) - $(cat /tmp/sb-start)))
 }
 
 # Runs sb-spin0 and sb-spin, which differ by a known number of instructions.
@@ -188,5 +221,5 @@ case "$cmd" in
     sync
     if [ "$status" = 0 ]; then summary "$runs runs, average"; else summary "exit $status"; fi
     ;;
-  *) echo "usage: sb sync|run|bench [EPOCH ROWS COLS [FILE [N]]]" >&2; exit 2 ;;
+  *) echo "usage: sb sync|run|bench [ROWS COLS [FILE [N]]]" >&2; exit 2 ;;
 esac
