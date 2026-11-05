@@ -14,6 +14,7 @@ import {
 } from "./settings";
 import { GuestSync, type GuestChanges } from "./sync";
 import { SerialTerminal, TERMINAL_THEMES } from "./terminal";
+import { contextOf, WorkCache } from "./work-cache";
 import {
   createVm,
   fetchBundles,
@@ -98,6 +99,10 @@ const settings = loadSettings();
 // --- VM and terminals ----------------------------------------------------
 
 const params = new URLSearchParams(location.search);
+/** Edited files, kept across reloads for the day the sandbox was opened for */
+const work = new WorkCache(contextOf(params));
+work.onFull = () =>
+  setStatus("Browser storage is full; recent edits won't survive a reload");
 const started = performance.now();
 setStatus("Downloading snapshot…");
 const contentPromise = fetchContent();
@@ -335,6 +340,9 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
     viewState: null,
   };
   model.onDidChangeContent(() => {
+    // Programs' changes are kept too, for files edited here
+    if (!loadingDisk || work.has(path))
+      work.edited(path, () => model.getValue());
     // The VM's copy coming in is saved already
     if (loadingDisk) return;
     renderTabs();
@@ -571,6 +579,8 @@ function closeFiles(paths: string[]) {
   )
     return;
 
+  // Keep the last edits before the models go
+  work.flush();
   const order = [...open.keys()];
   for (const path of paths) {
     const tab = open.get(path)!;
@@ -707,6 +717,14 @@ function renderTabs() {
   );
   ui.tabs.querySelector(".active")?.scrollIntoView({ block: "nearest" });
   ui.empty.hidden = open.size > 0;
+
+  // While a page tab is active, the file last active stays the one to restore
+  const fileTabs = [...open.keys()].filter((key) => fileAt(key));
+  const last = work.saved.active;
+  work.tabs(
+    fileTabs,
+    fileAt(active) ? active : last && fileTabs.includes(last) ? last : undefined
+  );
 }
 
 // A mouse wheel scrolls the tabs sideways, like VS Code
@@ -1802,6 +1820,8 @@ async function reset() {
     file.model.dispose();
     open.delete(key);
   }
+  // The snapshot's files replace the edits, after a reload too
+  work.clearFiles();
   activate(undefined);
   await vm.restore_state(snapshot);
   counter.resync();
@@ -1905,10 +1925,34 @@ window.addEventListener("keydown", onShortcutKey, { capture: true });
 // Closing loses the VM, not just unsaved edits, so always ask. Browsers only
 // ask once the page has been clicked or typed in.
 window.addEventListener("beforeunload", (event) => {
+  work.flush();
   event.preventDefault();
   // Older browsers ask only when this is set
   event.returnValue = "";
 });
+
+window.addEventListener("pagehide", () => work.flush());
+
+/**
+ * Puts back the files edited the last time the sandbox was open for this
+ * day, and reopens their tabs. True if it opened any.
+ */
+async function restoreWork(): Promise<boolean> {
+  const { files: saved, open: tabs, active: last } = work.saved;
+  for (const [path, text] of Object.entries(saved)) {
+    if (files.isDir(path)) continue;
+    await files.write(path, text);
+  }
+  let opened = false;
+  for (const path of tabs) {
+    if (files.exists(path) && !files.isDir(path)) {
+      await openFile(path, { focus: false });
+      opened = true;
+    }
+  }
+  if (last && open.has(last)) activate(last);
+  return opened;
+}
 
 // --- Start ---------------------------------------------------------------
 
@@ -1940,7 +1984,17 @@ setStatus(
   `Ready in ${(metrics.timeToPromptMs / 1000).toFixed(1)}s, ${mb(metrics.bytesToPrompt)} downloaded`
 );
 
-if (!(await openFromParams(params))) await openFile("/workspace/README.md");
+const openedDay = await openFromParams(params);
+// A solution opened from its page stays in front of the restored tabs
+const requested = fileAt(active) ? active : undefined;
+const restored = await restoreWork();
+if (requested) activate(requested);
+if (!openedDay && !restored) await openFile("/workspace/README.md");
+work.start();
+// Records the tabs open now, which startup didn't
+renderTabs();
+if (Object.keys(work.saved.files).length)
+  setStatus("Restored your edits from last time");
 // Until now it stood in for the editor while the VM started
 ui.empty.textContent =
   "Open a file from the explorer, or press Ctrl+P to find one.";
