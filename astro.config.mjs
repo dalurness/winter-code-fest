@@ -8,6 +8,8 @@ import rehypeMathJaxSvg from "rehype-mathjax";
 import { unified } from "@astrojs/markdown-remark";
 import { createReadStream, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
+import { SHIKI_ALIASES } from "./src/sandbox/solution-languages.ts";
+import { textMate as clank } from "./src/highlight/clank.ts";
 
 const BASE = "/winter-code-fest/";
 const V86_URL = `${BASE}sandbox/v86/`;
@@ -68,8 +70,13 @@ export default defineConfig({
     plugins: [tailwindcss(), sandboxFiles()],
   },
   markdown: {
-    // Code blocks sit on the same light blue as the sandbox's Markdown preview
-    shikiConfig: { theme: "github-light" },
+    // Code blocks sit on the same light blue as the sandbox's Markdown preview.
+    // Shiki ships every language the sandbox highlights but Clank.
+    shikiConfig: {
+      theme: "github-light",
+      langs: [clank],
+      langAlias: SHIKI_ALIASES,
+    },
     processor: unified({
       remarkPlugins: [remarkMath],
       rehypePlugins: [rehypeMathJaxSvg],

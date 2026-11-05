@@ -1,7 +1,8 @@
 // Which code blocks in a community solution the sandbox can turn into files.
 // Shared by the sandbox's content (src/pages/sandbox/content.json.ts) and the
-// PR check (scripts/check-solution-languages.ts). The README lists these
-// languages for people submitting solutions; keep it in step.
+// PR check (scripts/check-solution-languages.ts), and the site's code block
+// highlighting (astro.config.mjs). The README lists these languages for people
+// submitting solutions; keep it in step.
 
 /** Code block languages used in solutions, and the file extension for each */
 export const EXTENSIONS: Record<string, string> = {
@@ -27,6 +28,24 @@ export const EXTENSIONS: Record<string, string> = {
   typescript: "ts",
   zig: "zig",
 };
+
+/** Shiki's name for a language, where the code block's isn't one */
+const SHIKI_NAMES: Record<string, string> = { deno: "typescript" };
+
+/**
+ * Shiki's `langAlias`, for the site's code blocks. Shiki matches names
+ * exactly, so ```Deno gets an alias too, as does the capitalized form of
+ * every other language.
+ */
+export const SHIKI_ALIASES: Record<string, string> = Object.fromEntries(
+  Object.keys(EXTENSIONS).flatMap((language) => {
+    const shiki = SHIKI_NAMES[language];
+    const capitalized = language[0]!.toUpperCase() + language.slice(1);
+    const aliases: [string, string][] = [[capitalized, shiki ?? language]];
+    if (shiki) aliases.push([language, shiki]);
+    return aliases;
+  })
+);
 
 /** Fenced code blocks with a language: ```ruby ... ``` */
 const CODE_BLOCK = /^```(\w+)[^\n]*\n([\s\S]*?)^```/gm;
