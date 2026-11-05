@@ -21,6 +21,8 @@ const MARKER = "\x1b]7771;";
 
 const encoder = new TextEncoder();
 
+const MAX_PASTE_BYTES = 1e6;
+
 /** Text a terminal asked to copy, waiting for a click because the browser refused */
 let pendingCopy: string | undefined;
 
@@ -142,12 +144,16 @@ export class SerialTerminal {
   ) {
     this.term.loadAddon(this.fit);
     this.term.open(element);
-    // OSC 52 copies to the clipboard: ESC ] 52 ; c ; BASE64 BEL. The image's
-    // wl-copy, xclip, xsel and pbcopy send it, and so can tmux and Neovim.
-    // Reading the clipboard ("?" instead of the text) isn't supported.
+    // OSC 52 copies to the clipboard: ESC ] 52 ; c ; BASE64 BEL. With "?"
+    // instead of the text it asks for the clipboard, and the answer is typed
+    // back in the same form. The image's wl-copy, xclip, xsel and pbcopy and
+    // their paste versions use it, and so can tmux and Neovim.
     this.term.parser.registerOscHandler(52, (data) => {
       const base64 = data.slice(data.indexOf(";") + 1);
-      if (base64 === "?") return true;
+      if (base64 === "?") {
+        void this.pasteToGuest(status);
+        return true;
+      }
       try {
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
         copyFromGuest(new TextDecoder().decode(bytes), status);
@@ -179,6 +185,42 @@ export class SerialTerminal {
     vm.add_listener(`serial${port}-output-byte`, (byte) => this.receive(byte));
     new ResizeObserver(() => !element.hidden && this.fit.fit()).observe(
       element
+    );
+  }
+
+  /**
+   * Answers a request for the clipboard. Any program in the VM could ask, so
+   * it is only answered while this terminal has focus, as it does right after
+   * typing a paste command. A refusal answers with nothing, so the command
+   * doesn't wait.
+   */
+  private async pasteToGuest(status: (text: string) => void) {
+    let text = "";
+    if (
+      !document.hasFocus() ||
+      !this.element.contains(document.activeElement)
+    ) {
+      status(
+        "Pasting from the clipboard only works while its terminal has focus"
+      );
+    } else {
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        status("The browser didn't allow reading the clipboard");
+      }
+    }
+    let bytes = encoder.encode(text);
+    // It's typed in through the emulated serial port, which is slow for more
+    if (bytes.length > MAX_PASTE_BYTES) {
+      status("The clipboard is too big to paste into the VM (over 1 MB)");
+      bytes = new Uint8Array();
+    }
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    this.vm.serial_send_bytes(
+      this.port,
+      encoder.encode(`\x1b]52;c;${btoa(binary)}\x07`)
     );
   }
 

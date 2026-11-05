@@ -1,0 +1,81 @@
+#!/bin/sh
+# Copies to and pastes from the browser's clipboard. Installed as wl-copy,
+# wl-paste, xclip, xsel, pbcopy and pbpaste, so their usual forms work:
+#
+#   echo hi | wl-copy     wl-copy some text     wl-copy -n < file
+#   xclip -sel clip file  xsel -b < file        pbcopy < file
+#   wl-paste              xclip -o              xsel -ob              pbpaste
+#
+# It talks to the terminal in OSC 52 escape sequences, as tmux and Neovim do.
+# To copy, it sends the text, and the page puts it on the clipboard. To paste,
+# it sends "?" instead, and the page types the clipboard back the same way.
+# The page only answers while the terminal has focus, and the browser may ask
+# to allow it first.
+name=$(basename "$0")
+paste=
+trim=
+case "$name" in wl-paste | pbpaste) paste=1 ;; esac
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    # xclip's and xsel's, which can also be combined as in xsel -ob
+    -o | -out | --output | -ob | -bo | -op | -po | -os | -so) paste=1 ;;
+    -n | --trim-newline | --no-newline) trim=1 ;;
+    # Options of xclip and wl-copy that take a value
+    -sel | -selection | -t | -target | -type | --type | -s | --seat | -l | -loops | -d | -display) shift ;;
+    --) shift; break ;;
+    # -b, -i, -c, --clipboard and the like change nothing here
+    -*) ;;
+    *) break ;;
+  esac
+  shift
+done
+
+if [ -n "$paste" ]; then
+  if ! exec 3<> /dev/tty 2>/dev/null; then
+    echo "$name: pasting needs a terminal" >&2
+    exit 1
+  fi
+  # Raw, so the answer isn't echoed or held back until a newline
+  saved=$(stty -g <&3)
+  trap 'stty "$saved" <&3' EXIT
+  trap 'exit 130' INT TERM
+  stty raw -echo <&3
+  printf '\033]52;c;?\007' >&3
+  # The answer ends in BEL. Anything typed meanwhile comes before it.
+  # shellcheck disable=SC3045 # busybox ash has read -d and -t
+  if ! IFS= read -r -d "$(printf '\007')" -t 30 reply <&3; then
+    echo "$name: the page didn't answer" >&2
+    exit 1
+  fi
+  case "$reply" in
+    *"]52;c;"*) printf '%s' "${reply##*]52;c;}" | base64 -d ;;
+    *) echo "$name: the page didn't answer" >&2; exit 1 ;;
+  esac
+  # wl-paste ends with a newline unless told not to
+  if [ "$name" = wl-paste ] && [ -z "$trim" ]; then echo; fi
+  exit 0
+fi
+
+text() {
+  if [ $# -eq 0 ]; then
+    cat
+  elif [ "$name" = xclip ]; then
+    # xclip reads its arguments as files
+    cat -- "$@"
+  else
+    # wl-copy copies its arguments
+    printf '%s' "$*"
+  fi
+}
+
+if [ -n "$trim" ]; then
+  # $(...) drops the trailing newlines
+  data=$(printf '%s' "$(text "$@")" | base64 | tr -d '\n')
+else
+  data=$(text "$@" | base64 | tr -d '\n')
+fi
+
+# To the terminal itself, so it still arrives when output is redirected
+printf '\033]52;c;%s\007' "$data" 2>/dev/null > /dev/tty ||
+  printf '\033]52;c;%s\007' "$data" >&2
