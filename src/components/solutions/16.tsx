@@ -5,9 +5,9 @@ export default function () {
     <AnswerChecker
       answers={[
         {
-          label: "Start and end indexes",
-          placeholder: "[10,14]",
-          check: matchesNumbers(13257, 13278),
+          label: "Sum of the first 50,000 Elf Numbers",
+          placeholder: "123",
+          check: matchesNumbers(3489774699),
         },
       ]}
     />

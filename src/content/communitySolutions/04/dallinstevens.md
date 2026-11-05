@@ -4,62 +4,100 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
-### Output
-
-```
-Total Time: 2803
-```
-
 ```ts
-const EPSILON = 1e-9;
+interface Coordinates {
+  x: number;
+  y: number;
+}
 
-class Elf {
-  effeciency: number;
-  timeLeftOnPresent: number = 0;
-  hasPresent: boolean = false;
+class Canvas {
+  private commands: string[];
+  private grid: string[][];
+  private currentPosition: Coordinates;
 
-  constructor(effeciency: number) {
-    this.effeciency = effeciency;
+  constructor(commands: string[]) {
+    this.commands = commands;
+    this.grid = [];
+    this.currentPosition = { x: 0, y: 0 };
   }
 
-  processPresent() {
-    this.timeLeftOnPresent -= this.effeciency;
-    if (this.timeLeftOnPresent <= EPSILON) {
-      this.hasPresent = false;
+  private ensureGridSize() {
+    if (this.currentPosition.y >= this.grid.length) {
+      const newColsNeeded = this.currentPosition.y - this.grid.length + 1;
+      for (let i = 0; i < newColsNeeded; i++) {
+        this.grid.push([" "]);
+      }
+    }
+    if (this.currentPosition.x > this.grid[this.currentPosition.y].length) {
+      const newRowsNeeded =
+        this.currentPosition.x - this.grid[this.currentPosition.y].length;
+      for (let i = 0; i < newRowsNeeded; i++) {
+        this.grid[this.currentPosition.y].push(" ");
+      }
     }
   }
 
-  assignPresent(presentTime: number) {
-    this.timeLeftOnPresent = presentTime + this.effeciency; // one minute to grab present regardless of efficiency
-    this.hasPresent = true;
+  private moveX(amount: number) {
+    this.currentPosition.x += amount;
+    if (this.currentPosition.x < 0) {
+      throw new Error("Negative X Value. Out of bounds");
+    }
+  }
+
+  private moveY(amount: number) {
+    this.currentPosition.y += amount;
+    if (this.currentPosition.x < 0) {
+      throw new Error("Negative Y Value. Out of bounds");
+    }
+  }
+
+  private printValue(value: string) {
+    this.ensureGridSize();
+    this.grid[this.currentPosition.y][this.currentPosition.x] = value;
+  }
+
+  public executeCommands() {
+    for (const command of this.commands) {
+      console.log(command);
+      if (command == "P-") {
+        console.clear();
+      }
+      if (command == "LR") {
+        this.currentPosition = { x: 0, y: 0 };
+      } else {
+        switch (command[0]) {
+          case "U":
+            this.moveY(-Number(command.slice(1)));
+            break;
+          case "D":
+            this.moveY(Number(command.slice(1)));
+            break;
+          case "L":
+            this.moveX(-Number(command.slice(1)));
+            break;
+          case "R":
+            this.moveX(Number(command.slice(1)));
+            break;
+          case "P":
+            this.printValue(command.slice(1));
+            break;
+        }
+      }
+    }
+  }
+
+  public printGrid() {
+    for (const row of this.grid) {
+      console.log(row.join(""));
+    }
   }
 }
 
 if (import.meta.main) {
-  const presents = (await Deno.readTextFile("presents.txt")).split(" ");
+  const commands = (await Deno.readTextFile("5.txt")).split("\n");
 
-  const elves = [new Elf(1.4), new Elf(0.7), new Elf(1.1), new Elf(1.0)];
-
-  let time = 0;
-  let elvesStillWorking = true;
-
-  while (presents.length > 0 || elvesStillWorking) {
-    elvesStillWorking = false;
-    for (const elf of elves) {
-      if (!elf.hasPresent && presents.length !== 0) {
-        const p = presents.shift();
-        elf.assignPresent(Number(p));
-        elvesStillWorking = true;
-      }
-      if (elf.hasPresent) {
-        elf.processPresent();
-        elvesStillWorking = true;
-      }
-    }
-    if (elvesStillWorking) {
-      time++;
-    }
-  }
-  console.log(time);
+  const canvas = new Canvas(commands);
+  canvas.executeCommands();
+  canvas.printGrid();
 }
 ```

@@ -1,161 +1,88 @@
 ---
-descriptions: ["gleam"]
+descriptions: ["zig"]
 ---
 
-### 2024 Solution Gleam
+## 2025
 
 <details>
-<summary>Show Gleam Solution</summary>
-
-```gleam
-import gleam/int
-import gleam/io
-import gleam/list
-import gleam/string
-import simplifile
-
-pub fn main() {
-  let filename = "bin.txt"
-  case simplifile.read(filename) {
-    Ok(file_contents) -> file_contents
-    Error(_) -> {
-      io.println("failed to read file: " <> filename)
-      panic as "failed to read file"
-    }
-  }
-  |> string.split("")
-  |> list.sized_chunk(8)
-  |> list.map(fn(l) {
-    let joined_str = string.join(l, "")
-    let assert Ok(int_val) = int.base_parse(joined_str, 2)
-    let assert Ok(cp) = string.utf_codepoint(int_val)
-    cp
-  })
-  |> string.from_utf_codepoints
-  |> io.println
-}
-```
+<summary>Show Zig Solution</summary>
 
 #### Output
 
 ```
-Liam: NICE
-Emma: NICE
-Noah: NICE
-Olivia: NICE
-Sophia: NICE
-Jackson: NICE
-Ava: NAUGHTY
-Aiden: NAUGHTY
-Isabella: NICE
-Lucas: NICE
-Mia: NICE
-Caden: NICE
-Charlotte: NAUGHTY
-Grayson: NICE
-Amelia: NICE
-Muhammad: NICE
-Harper: NICE
-Mason: NICE
-Evelyn: NICE
-Elijah: NAUGHTY
-Abigail: NICE
-Oliver: NICE
-Emily: NAUGHTY
-Jacob: NAUGHTY
-Elizabeth: NAUGHTY
-Michael: NICE
-Mila: NAUGHTY
-Alexander: NICE
-Ella: NICE
-William: NICE
-Sofia: NICE
-James: NICE
-Camila: NICE
-Benjamin: NICE
-Avery: NAUGHTY
-Henry: NICE
-Scarlett: NAUGHTY
-Daniel: NAUGHTY
-Victoria: NICE
-Matthew: NAUGHTY
-Luna: NAUGHTY
-Jackson: NICE
-Grace: NICE
-Logan: NICE
-Chloe: NAUGHTY
-Sebastian: NICE
-Penelope: NAUGHTY
-Levi: NICE
-Layla: NICE
-Mateo: NICE
-Riley: NICE
-David: NICE
-Zoey: NICE
-Samuel: NICE
-Nora: NICE
-Joseph: NICE
-Lily: NICE
-John: NICE
-Eleanor: NICE
-Henry: NICE
-Hannah: NICE
-Owen: NICE
-Lillian: NAUGHTY
-Jack: NAUGHTY
-Addison: NAUGHTY
-Wyatt: NICE
-Aubrey: NAUGHTY
-Luke: NAUGHTY
-Ellie: NICE
-Jayden: NICE
-Stella: NAUGHTY
-Dylan: NAUGHTY
-Natalie: NAUGHTY
-Nicholas: NICE
-Zoe: NICE
-Isaac: NICE
-Leah: NICE
-Olivia: NICE
-Hazel: NICE
-Charlie: NAUGHTY
-Violet: NICE
-Gabriel: NICE
-Aurora: NICE
-Julian: NICE
-Savannah: NICE
-Caleb: NAUGHTY
-Audrey: NAUGHTY
-Daniel: NICE
-Brooklyn: NAUGHTY
-Ryan: NAUGHTY
-Claire: NICE
-Tyler: NICE
-Bella: NICE
-William: NICE
-Lucy: NICE
-Zachary: NICE
-Anna: NICE
-Nathan: NICE
-Samantha: NICE
-Thomas: NICE
-Genesis: NICE
-Peter: NICE
-Maya: NICE
-Eli: NICE
-Lily: NICE
-Mateo: NICE
-Emilia: NICE
-Isaiah: NICE
-Valentina: NICE
-Anthony: NAUGHTY
-Josephine: NICE
-Joshua: NAUGHTY
-Nova: NICE
-Christopher: NICE
-Naomi: NICE
-Andrew: NAUGHTY
-Madison: NICE
+41
+```
+
+```zig
+const std = @import("std");
+
+const SEPARATOR = ',';
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+    var str = std.ArrayList(u8).empty;
+    defer str.deinit(allocator);
+    for (1..1_000_001) |i| {
+        const digits = try digitsOfInt(@as(u256, i), allocator);
+        for (digits) |d| {
+            if (d == '8') {
+                try str.append(allocator, SEPARATOR);
+            } else {
+                try str.append(allocator, d);
+            }
+        }
+        if (i % 6 == 0) {
+            try str.append(allocator, SEPARATOR);
+        }
+    }
+
+    var sum: u256 = 0;
+    var next_num = std.ArrayList(u8).empty;
+    defer next_num.deinit(allocator);
+    for (str.items) |c| {
+        if (c == ',') {
+            if (next_num.items.len > 0) {
+                const num = try std.fmt.parseInt(u256, next_num.items, 10);
+                sum += num;
+                next_num.clearRetainingCapacity();
+            }
+        } else {
+            try next_num.append(allocator, c);
+        }
+    }
+
+    const digits = try digitsOfInt(sum, allocator);
+
+    std.debug.print("{}", .{digits.len});
+    std.debug.print("\n", .{});
+}
+
+fn digitsOfInt(num: u256, allocator: std.mem.Allocator) ![]u8 {
+    var n = num;
+
+    // Special case for 0
+    if (n == 0) {
+        const buf = try allocator.alloc(u8, 1);
+        buf[0] = 0;
+        return buf;
+    }
+
+    var tmp: [77]u8 = undefined; // enough for 256-bit ints
+    var i: usize = 0;
+
+    while (n > 0) {
+        tmp[i] = @intCast('0' + (n % 10));
+        n /= 10;
+        i += 1;
+    }
+
+    // reverse to correct order
+    const out = try allocator.alloc(u8, i);
+    for (out, 0..) |*d, j| {
+        d.* = tmp[i - 1 - j];
+    }
+    return out;
+}
+
 ```
 
 </details>

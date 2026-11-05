@@ -1,13 +1,13 @@
-import { AnswerChecker, matchesNumbers } from "../AnswerChecker";
+import { AnswerChecker } from "../AnswerChecker";
 
 export default function () {
   return (
     <AnswerChecker
       answers={[
         {
-          label: "Number of cities",
-          placeholder: "27",
-          check: matchesNumbers(1753),
+          label: "Key for secret1.txt - secret6.txt",
+          placeholder: "XmasXmas",
+          check: (input) => input.trim() === "deerHugs",
         },
       ]}
     />

@@ -7,120 +7,97 @@ descriptions: ["zig"]
 <details>
 <summary>Show Zig Solution</summary>
 
-### Output
-
-```
-Total Time: 2803
-```
-
 ```zig
 const std = @import("std");
 
-const Elf = struct {
-    speed: f32,
-    workload: usize,
-
-    fn getNewWorkload(self: *Elf, workload: usize) void {
-        const fworkload = @as(f32, @floatFromInt(workload));
-        const elf_workload: usize = @intFromFloat(@ceil(fworkload / self.speed));
-        self.workload = self.workload + elf_workload + 1; // add one for getting up to get another
-    }
-
-    fn subtractTime(self: *Elf, amount: usize) void {
-        self.workload -= amount;
-    }
-};
 pub fn main() !void {
+    var filename_buf: [11]u8 = undefined;
+    var buffer: [10]u8 = undefined;
+    for (0..6) |i| {
+        const filename = try std.fmt.bufPrint(&filename_buf, "./src/{}.txt", .{i});
+        var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
+        defer file.close();
+
+        // parse the file and process
+        const out_filename = try std.fmt.bufPrint(&filename_buf, "./src/{}.out", .{i});
+        var write_file = try std.fs.cwd().createFile(
+            out_filename,
+            .{},
+        );
+        defer write_file.close();
+        try processFile(&write_file, &file, buffer[0..]);
+    }
+}
+
+const Loc = packed struct {
+    x: usize,
+    y: usize,
+};
+
+fn writeLoc(l: *usize, max: *usize, v: usize) void {
+    l.* = v;
+    if (l.* > max.*) {
+        max.* = l.*;
+    }
+}
+
+fn processFile(write_file: *std.fs.File, file: *std.fs.File, filebuf: []u8) !void {
     const allocator = std.heap.page_allocator;
-    const original_file: []const u8 = @embedFile("presents.txt");
-    const file: []const u8 = original_file;
+    var x: usize = 0;
+    var y: usize = 0;
+    var max_x: usize = 0;
+    var max_y: usize = 0;
 
-    var i: usize = 0;
-    var presents = try std.ArrayList(usize).initCapacity(allocator, 0);
-    defer presents.deinit(allocator);
+    var reader = file.reader(filebuf);
+    var map = std.AutoHashMap(Loc, u8).init(allocator);
+    defer map.deinit();
+    while (reader.interface.takeDelimiterExclusive('\n')) |line| {
+        switch (line[0]) {
+            'D' => {
+                const num = try std.fmt.parseInt(usize, line[1..], 10);
+                writeLoc(&x, &max_x, x + num);
+            },
+            'U' => {
+                const num = try std.fmt.parseInt(usize, line[1..], 10);
+                writeLoc(&x, &max_x, x - num);
+            },
+            'R' => {
+                const num = try std.fmt.parseInt(usize, line[1..], 10);
+                writeLoc(&y, &max_y, y + num);
+            },
+            'L' => {
+                switch (line[1]) {
+                    'R' => {
+                        x = 0;
+                        y = 0;
+                    },
+                    else => {
+                        const num = try std.fmt.parseInt(usize, line[1..], 10);
+                        writeLoc(&y, &max_y, y - num);
+                    },
+                }
+            },
+            'P' => {
+                try map.put(Loc{ .x = x, .y = y }, line[1]);
+            },
+            else => {
+                std.debug.print("invalid code: {c}", .{line[0]});
+                return error.InvalidCode;
+            },
+        }
+    } else |err| if (err != error.EndOfStream) return err;
 
-
-    while (i < file.len) {
-        // find each number
-        var j: usize = 0;
-        while (true) {
-            if ((i + j == file.len) or (file[i + j] == ' ')) {
-                const new_number = try std.fmt.parseInt(usize, file[i..(i + j)], 10);
-                try presents.append(allocator, new_number);
-                i = i + j + 1;
-                break;
+    // print out result to file
+    for (0..max_x) |x_val| {
+        for (0..max_y) |y_val| {
+            if (map.get(Loc{ .x = x_val, .y = y_val })) |v| {
+                _ = try write_file.write(&[_]u8{v});
             } else {
-                j += 1;
+                _ = try write_file.write(&[_]u8{' '});
             }
         }
+        _ = try write_file.write(&[_]u8{'\n'});
     }
-    var elf1: Elf = .{
-        .speed = 1.4,
-        .workload = 0,
-    };
-    var elf2: Elf = .{
-        .speed = 0.7,
-        .workload = 0,
-    };
-    var elf3: Elf = .{
-        .speed = 1.1,
-        .workload = 0,
-    };
-    var elf4: Elf = .{
-        .speed = 1.0,
-        .workload = 0,
-    };
-
-    const elves = [4]*Elf{
-        &elf1,
-        &elf2,
-        &elf3,
-        &elf4,
-    };
-
-    var workloads: [4]usize = undefined;
-    var next_present: usize = 0;
-    var total_time: usize = 0;
-    while (true) {
-        for (elves, 0..) |e, ind| {
-            workloads[ind] = e.workload;
-        }
-
-        const max_workload = maxInt(&workloads);
-        const min_workload = minInt(&workloads, max_workload);
-        if (max_workload == 0 and next_present == presents.items.len) break;
-        total_time += min_workload;
-        for (elves) |e| {
-            if (e.workload != 0) {
-                e.subtractTime(min_workload);
-            }
-            if (e.workload == 0 and next_present < presents.items.len) {
-                e.getNewWorkload(presents.items[next_present]);
-                next_present += 1;
-            }
-        }
-    }
-
-    std.debug.print("Total Time: {}", .{total_time});
-}
-
-fn minInt(nums: []usize, max_int: usize) usize {
-    var min = max_int;
-    if (min == 0) {
-        return min;
-    }
-    for (nums[0..]) |n| {
-        if (n < min and n > 0) min = n;
-    }
-    return min;
-}
-
-fn maxInt(nums: []usize) usize {
-    var max = nums[0];
-    for (nums[1..]) |n| {
-        if (n > max) max = n;
-    }
-    return max;
 }
 ```
 

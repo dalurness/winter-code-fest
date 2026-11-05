@@ -5,45 +5,62 @@ descriptions: ["ruby"]
 ## 2025
 
 ```ruby
-class Day04
+require 'optparse'
+
+class Day05
   def initialize(filename)
     @filename = filename
   end
 
   def solve
-    total_time = 0
+    canvas = []
+    x = 0
+    y = 0
 
-    # Snap, Crackle, Pop, and Steve, one of the better looking elves
-    elves_multiplyer = [1.4, 0.7, 1.1, 1]
-    working_elves = [0, 0, 0, 0] # how long each elf is still working on a present
+    File.open(@filename).each_line do |cmd|
+      case cmd.strip
+      when /^LR$/
+        x = 0
+        y = 0
+      when /^D(\d+)$/ then y += ::Regexp.last_match(1).to_i
+      when /^U(\d+)$/ then y -= ::Regexp.last_match(1).to_i
+      when /^R(\d+)$/ then x += ::Regexp.last_match(1).to_i
+      when /^L(\d+)$/ then x -= ::Regexp.last_match(1).to_i
+      when /^P(.)$/
+        raise "Negative position for #{cmd}: x=#{x}, y=#{y}" if x.negative? || y.negative?
 
-    File.open(@filename).each(' ') do |present|
-      time = present.to_i
-      next_elf = working_elves.find_index(0) # find first non-working elf
+        # expand canvas vertically if needed with empty arrays
+        canvas.fill(canvas.size..y) { [] } unless canvas.size > y
+        row = canvas[y]
+        # expand row horizontally if needed with spaces
+        row.fill(' ', row.size..x) unless row.size > x
 
-      # if they are all working then advance time by the minimum time left for an elf to finish
-      if next_elf.nil?
-        min_time_left = working_elves.min
-        total_time += min_time_left
-        working_elves = working_elves.map { |t| t - min_time_left }
-        next_elf = working_elves.find_index(0)
+        # add the letter to the canvas
+        row[x] = ::Regexp.last_match(1)
+      else
+        raise "invalid command: #{cmd}"
       end
-
-      # get that elf workin
-      time_needed = (time / elves_multiplyer[next_elf]).ceil + 1
-      working_elves[next_elf] = time_needed
     end.close
 
-    max_time_left = working_elves.max
-    total_time += max_time_left
-
-    puts "Total Time: #{total_time} minutes"
+    canvas.each do |row|
+      puts row.join('')
+    end
   end
 end
 
-# Expects the input file to be named 04.txt and in the current working directory
+# Expects the input files to be named 05_[0-5].txt and in the current working directory
 if __FILE__ == $PROGRAM_NAME
-  challenge = Day04.new('04.txt')
+  options = {}
+  OptionParser.new do |parser|
+    parser.banner = "Usage: #{$PROGRAM_NAME} [options]"
+
+    parser.on('-[0-5]', 'Solve with different input. Default 0') do |value|
+      options[:input] = value
+    end
+  end.parse!
+
+  challenge = Day05.new("05_#{options[:input] || '0'}.txt")
   challenge.solve
 end
+
 ```
