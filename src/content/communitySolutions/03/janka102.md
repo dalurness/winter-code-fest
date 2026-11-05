@@ -23,18 +23,20 @@ func main() {
 
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 
-	valid := 0
-	added := 0
-	removed := 0
+	valid, added, removed := 0, 0, 0
 	for scanner.Scan() {
 		line := scanner.Text()
 		invalid := false
 
+		// Must end with "CP"
 		if line[len(line)-2:] != "CP" {
 			invalid = true
 		}
 
+		// Last two chars don't matter anymore after checking above
 		for _, c := range line[:len(line)-2] {
+			// Both A and C are added, but C makes it invalid
+			// Both R and P are removed, but P makes it invalid
 			switch c {
 			case 'C':
 				invalid = true
@@ -52,6 +54,10 @@ func main() {
 		if !invalid {
 			valid++
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Invalid input: %s\n", err)
 	}
 
 	fmt.Printf("Valid: %d\n", valid)
