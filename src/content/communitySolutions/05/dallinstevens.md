@@ -4,100 +4,91 @@ descriptions: ["deno"]
 
 ### 2025 Solution Deno
 
+### Output
+
+```
+1: Solutions - 1
+2: Solutions - 1
+3: Solutions - 3
+4: Solutions - 4
+5: Solutions - 7
+6: Solutions - 14
+7: Solutions - 23
+8: Solutions - 39
+9: Solutions - 71
+10: Solutions - 123
+11: Solutions - 211
+12: Solutions - 372
+13: Solutions - 647
+14: Solutions - 1123
+15: Solutions - 1967
+16: Solutions - 3426
+17: Solutions - 5961
+18: Solutions - 10405
+19: Solutions - 18134
+20: Solutions - 31593
+21: Solutions - 55094
+22: Solutions - 96030
+23: Solutions - 167357
+24: Solutions - 291758
+25: Solutions - 508564
+26: Solutions - 886414
+27: Solutions - 1545162
+28: Solutions - 2693373
+29: Solutions - 4694687
+30: Solutions - 8183372
+31: Solutions - 14264404
+```
+
 ```ts
-interface Coordinates {
-  x: number;
-  y: number;
-}
+class TubeSleigh {
+  private static memorizedSolutions: Map<string, number[][]> = new Map();
+  private sequences: Generator<number[]>;
+  private sleighLength: number;
 
-class Canvas {
-  private commands: string[];
-  private grid: string[][];
-  private currentPosition: Coordinates;
-
-  constructor(commands: string[]) {
-    this.commands = commands;
-    this.grid = [];
-    this.currentPosition = { x: 0, y: 0 };
+  constructor(sleighLength: number) {
+    this.sleighLength = sleighLength;
+    this.sequences = this.solve(sleighLength, undefined);
   }
 
-  private ensureGridSize() {
-    if (this.currentPosition.y >= this.grid.length) {
-      const newColsNeeded = this.currentPosition.y - this.grid.length + 1;
-      for (let i = 0; i < newColsNeeded; i++) {
-        this.grid.push([" "]);
-      }
+  public *solve(
+    n: number,
+    prev: number | undefined = undefined,
+    prefix: number[] = []
+  ): Generator<number[]> {
+    if (n === 0) {
+      yield prefix;
+      return;
     }
-    if (this.currentPosition.x > this.grid[this.currentPosition.y].length) {
-      const newRowsNeeded =
-        this.currentPosition.x - this.grid[this.currentPosition.y].length;
-      for (let i = 0; i < newRowsNeeded; i++) {
-        this.grid[this.currentPosition.y].push(" ");
-      }
-    }
-  }
 
-  private moveX(amount: number) {
-    this.currentPosition.x += amount;
-    if (this.currentPosition.x < 0) {
-      throw new Error("Negative X Value. Out of bounds");
-    }
-  }
-
-  private moveY(amount: number) {
-    this.currentPosition.y += amount;
-    if (this.currentPosition.x < 0) {
-      throw new Error("Negative Y Value. Out of bounds");
-    }
-  }
-
-  private printValue(value: string) {
-    this.ensureGridSize();
-    this.grid[this.currentPosition.y][this.currentPosition.x] = value;
-  }
-
-  public executeCommands() {
-    for (const command of this.commands) {
-      console.log(command);
-      if (command == "P-") {
-        console.clear();
-      }
-      if (command == "LR") {
-        this.currentPosition = { x: 0, y: 0 };
-      } else {
-        switch (command[0]) {
-          case "U":
-            this.moveY(-Number(command.slice(1)));
-            break;
-          case "D":
-            this.moveY(Number(command.slice(1)));
-            break;
-          case "L":
-            this.moveX(-Number(command.slice(1)));
-            break;
-          case "R":
-            this.moveX(Number(command.slice(1)));
-            break;
-          case "P":
-            this.printValue(command.slice(1));
-            break;
+    for (let i = 1; i <= n && i < 10; i++) {
+      if (i !== prev) {
+        for (const seq of this.solve(n - i, i, [...prefix, i])) {
+          yield seq;
         }
       }
     }
   }
 
-  public printGrid() {
-    for (const row of this.grid) {
-      console.log(row.join(""));
+  public printSeq() {
+    for (const seq of this.sequences) {
+      console.log(seq.join(", "));
     }
+  }
+
+  public printSolutionsCount() {
+    let count = 0;
+    for (const _ of this.sequences) {
+      count++;
+    }
+    console.log(`${this.sleighLength}: Solutions - ${count}`);
   }
 }
 
 if (import.meta.main) {
-  const commands = (await Deno.readTextFile("5.txt")).split("\n");
-
-  const canvas = new Canvas(commands);
-  canvas.executeCommands();
-  canvas.printGrid();
+  for (let i = 1; i <= 31; i++) {
+    const myTubeSleigh = new TubeSleigh(i);
+    myTubeSleigh.printSolutionsCount();
+  }
 }
 ```

@@ -5,9 +5,9 @@ export default function () {
     <AnswerChecker
       answers={[
         {
-          label: "Number of digits",
+          label: "Total minutes",
           placeholder: "123",
-          check: matchesNumbers(41),
+          check: matchesNumbers(2803),
         },
       ]}
     />

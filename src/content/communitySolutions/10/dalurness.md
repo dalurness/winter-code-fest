@@ -1,8 +1,8 @@
 ---
-descriptions: ["zig"]
+descriptions: ["zig", "go"]
 ---
 
-## 2025
+### 2025 Solution Zig
 
 <details>
 <summary>Show Zig Solution</summary>
@@ -10,100 +10,146 @@ descriptions: ["zig"]
 #### Output
 
 ```
-[0, 87, 175]
-[22, 107, 114]
+Total Off Balance Weight: 580
 ```
 
 ```zig
 const std = @import("std");
 
-const INF: u32 = 4294967295;
-
-// Since all numbers are in order, I used kind of a pigeon-hole sort.
-// When I have solved this previously it took 3 passes to read, sort, and then find the missing numbers.
-// In this implementation it is 2 passes, the first reading and inserting in order, the second finding the missing numbers.
-
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
-    const original_file = @embedFile("presents.txt");
+    var file = try std.fs.cwd().openFile("./src/trees.txt", .{ .mode = .read_only });
+    defer file.close();
 
-    var presents = std.ArrayList(u32).empty;
+    var buf: [1024]u8 = undefined;
+    var reader = file.reader(&buf);
 
-    var i: u32 = 0;
-    var start: u32 = 0;
-    var size: usize = 0;
+    var off_balance_total: isize = 0;
+    var lw: isize = 0;
+    var rw: isize = 0;
+    var tw: isize = 0;
+    var nums: [4]isize = undefined;
 
-    // first pass
-    while (true) {
-        if (i + 1 == original_file.len) {
-            const new_num = try std.fmt.parseInt(u32, original_file[start .. i + 1], 10);
-            try insert(&allocator, &presents, new_num);
-            size += 1;
+    while (reader.interface.takeDelimiterExclusive('\n')) |line| {
+        switch (line.len) {
+            1 => {
+                nums[0] = try parseNum(line[0]);
+                tw += nums[0];
+            },
+            3 => {
+                nums[0] = try parseNum(line[0]);
+                nums[1] = try parseNum(line[2]);
+                lw += nums[0];
+                rw += nums[1];
+            },
+            7 => {
+                nums[0] = try parseNum(line[0]);
+                nums[1] = try parseNum(line[2]);
+                nums[2] = try parseNum(line[4]);
+                nums[3] = try parseNum(line[6]);
+                lw += (nums[0] + nums[1]);
+                rw += (nums[2] + nums[3]);
 
-            break;
+                // finish calcs for this tree
+                if (@abs(lw - rw) > 1) {
+                    off_balance_total += (lw + rw + tw);
+                }
+                lw = 0;
+                rw = 0;
+                tw = 0;
+            },
+            0 => {},
+            else => return error.UnexpectedWeight,
         }
-        if (original_file[i] == ' ') {
-            const new_num = try std.fmt.parseInt(u32, original_file[start..i], 10);
-            try insert(&allocator, &presents, new_num);
-            size += 1;
+    } else |err| if (err != error.EndOfStream) return err;
 
-            start = i + 1;
-        }
-        i += 1;
-    }
-
-    const first_center: u32 = @intCast(@divTrunc(size - 1, 2));
-    const first: u32 = 0;
-    var middle: u32 = INF;
-    var next: u32 = INF;
-    const last: u32 = presents.items[presents.items.len - 1];
-    var missing_nums = std.ArrayList(usize).empty;
-    var encountered: u32 = 0;
-
-    // second pass
-    for (presents.items, 0..) |pres, ind| {
-        if (pres != INF) {
-            // need the next in case we need the avg.
-            if (middle != INF and next == INF) {
-                next = pres;
-            }
-            // count up until we find the number at the "middle" which is the middle index minus the missing ones
-            if (encountered == first_center) {
-                middle = pres;
-            }
-            encountered += 1;
-        } else {
-            try missing_nums.append(allocator, ind);
-        }
-    }
-
-    // need to print the median. If it is even numbers, then need to find avg.
-    if (size % 2 == 0) {
-        const added: f64 = @floatFromInt(next + middle);
-        const ans: f64 = added / 2.0;
-        std.debug.print("[{}, {}, {}]\n", .{ first, ans, last });
-    } else {
-        std.debug.print("[{}, {}, {}]\n", .{ first, middle, last });
-    }
-
-    std.debug.print("[", .{});
-    for (missing_nums.items, 0..) |num, ind| {
-        std.debug.print("{}", .{num});
-        if (ind == missing_nums.items.len - 1) {
-            std.debug.print("]\n", .{});
-        } else {
-            std.debug.print(", ", .{});
-        }
-    }
-    std.debug.print("\n\n", .{});
+    std.debug.print("Total Off Balance Weight: {}\n", .{off_balance_total});
 }
 
-// manually manage the allocation of the arraylist keeping it the size of the largest number so far
-fn insert(allocator: *const std.mem.Allocator, list: *std.ArrayList(u32), new_num: u32) !void {
-    if (new_num >= list.items.len) {
-        try list.appendNTimes(allocator.*, INF, (new_num + 1) - list.items.len);
+fn parseNum(c: u8) !isize {
+    if (c == '_') return 0;
+    return try std.fmt.parseInt(isize, &[_]u8{c}, 10);
+}
+
+```
+
+</details>
+
+### 2024 Solution Go
+
+<details>
+<summary>Show Go Solution</summary>
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    "strconv"
+    "strings"
+)
+
+func absDiffInt(x, y int) int {
+    if x < y {
+        return y - x
     }
-    list.items[new_num] = new_num;
+    return x - y
+}
+
+func main() {
+    dat, err := os.ReadFile("../trees.txt")
+    if err != nil {
+        panic("failed to read file")
+    }
+
+    trees := strings.Split(string(dat[:]), "\n\n")
+
+    totalOffBalanceWeight := 0
+    for _, tree := range trees {
+        parts := strings.Split(tree, "\n")
+        trunkWeight, err := strconv.Atoi(parts[0])
+        if err != nil {
+            panic("trunc value incorrect")
+        }
+
+        leftWeight := 0
+        rightWeight := 0
+        limbsStrings := strings.Split(parts[1], " ")
+        leftLimb, err := strconv.Atoi(limbsStrings[0])
+        if err != nil {
+            panic("failed converting left limb amount")
+        }
+        leftWeight = leftWeight + leftLimb
+        rightLimb, err := strconv.Atoi(limbsStrings[1])
+        if err != nil {
+            panic("failed to convert right limb")
+        }
+        rightWeight = rightWeight + rightLimb
+
+        ornamentsStrings := strings.Split(parts[2], " ")
+        lOrn1, err := strconv.Atoi(ornamentsStrings[0])
+        if err == nil {
+            leftWeight = leftWeight + lOrn1
+        }
+        lOrn2, err := strconv.Atoi(ornamentsStrings[1])
+        if err == nil {
+            leftWeight = leftWeight + lOrn2
+        }
+        rOrn1, err := strconv.Atoi(ornamentsStrings[2])
+        if err == nil {
+            rightWeight = rightWeight + rOrn1
+        }
+        rOrn2, err := strconv.Atoi(ornamentsStrings[3])
+        if err == nil {
+            rightWeight = rightWeight + rOrn2
+        }
+        if absDiffInt(leftWeight, rightWeight) > 1 {
+            totalOffBalanceWeight = totalOffBalanceWeight + leftWeight + rightWeight + trunkWeight
+            fmt.Printf("Tree weight: %d\n", leftWeight+rightWeight+trunkWeight)
+        }
+    }
+
+    fmt.Printf("Total: %d\n", totalOffBalanceWeight)
 }
 ```
 

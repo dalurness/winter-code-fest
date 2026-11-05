@@ -2,87 +2,126 @@
 descriptions: ["zig"]
 ---
 
-## 2025
+### 2025 Solution Zig
 
 <details>
 <summary>Show Zig Solution</summary>
 
-#### Output
+### Output
 
 ```
-41
+Total Time: 2803
 ```
 
 ```zig
 const std = @import("std");
 
-const SEPARATOR = ',';
+const Elf = struct {
+    speed: f32,
+    workload: usize,
+
+    fn getNewWorkload(self: *Elf, workload: usize) void {
+        const fworkload = @as(f32, @floatFromInt(workload));
+        const elf_workload: usize = @intFromFloat(@ceil(fworkload / self.speed));
+        self.workload = self.workload + elf_workload + 1; // add one for getting up to get another
+    }
+
+    fn subtractTime(self: *Elf, amount: usize) void {
+        self.workload -= amount;
+    }
+};
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    var str = std.ArrayList(u8).empty;
-    defer str.deinit(allocator);
-    for (1..1_000_001) |i| {
-        const digits = try digitsOfInt(@as(u256, i), allocator);
-        for (digits) |d| {
-            if (d == '8') {
-                try str.append(allocator, SEPARATOR);
-            } else {
-                try str.append(allocator, d);
-            }
-        }
-        if (i % 6 == 0) {
-            try str.append(allocator, SEPARATOR);
-        }
-    }
+    const original_file: []const u8 = @embedFile("presents.txt");
+    const file: []const u8 = original_file;
 
-    var sum: u256 = 0;
-    var next_num = std.ArrayList(u8).empty;
-    defer next_num.deinit(allocator);
-    for (str.items) |c| {
-        if (c == ',') {
-            if (next_num.items.len > 0) {
-                const num = try std.fmt.parseInt(u256, next_num.items, 10);
-                sum += num;
-                next_num.clearRetainingCapacity();
-            }
-        } else {
-            try next_num.append(allocator, c);
-        }
-    }
-
-    const digits = try digitsOfInt(sum, allocator);
-
-    std.debug.print("{}", .{digits.len});
-    std.debug.print("\n", .{});
-}
-
-fn digitsOfInt(num: u256, allocator: std.mem.Allocator) ![]u8 {
-    var n = num;
-
-    // Special case for 0
-    if (n == 0) {
-        const buf = try allocator.alloc(u8, 1);
-        buf[0] = 0;
-        return buf;
-    }
-
-    var tmp: [77]u8 = undefined; // enough for 256-bit ints
     var i: usize = 0;
+    var presents = try std.ArrayList(usize).initCapacity(allocator, 0);
+    defer presents.deinit(allocator);
 
-    while (n > 0) {
-        tmp[i] = @intCast('0' + (n % 10));
-        n /= 10;
-        i += 1;
+
+    while (i < file.len) {
+        // find each number
+        var j: usize = 0;
+        while (true) {
+            if ((i + j == file.len) or (file[i + j] == ' ')) {
+                const new_number = try std.fmt.parseInt(usize, file[i..(i + j)], 10);
+                try presents.append(allocator, new_number);
+                i = i + j + 1;
+                break;
+            } else {
+                j += 1;
+            }
+        }
+    }
+    var elf1: Elf = .{
+        .speed = 1.4,
+        .workload = 0,
+    };
+    var elf2: Elf = .{
+        .speed = 0.7,
+        .workload = 0,
+    };
+    var elf3: Elf = .{
+        .speed = 1.1,
+        .workload = 0,
+    };
+    var elf4: Elf = .{
+        .speed = 1.0,
+        .workload = 0,
+    };
+
+    const elves = [4]*Elf{
+        &elf1,
+        &elf2,
+        &elf3,
+        &elf4,
+    };
+
+    var workloads: [4]usize = undefined;
+    var next_present: usize = 0;
+    var total_time: usize = 0;
+    while (true) {
+        for (elves, 0..) |e, ind| {
+            workloads[ind] = e.workload;
+        }
+
+        const max_workload = maxInt(&workloads);
+        const min_workload = minInt(&workloads, max_workload);
+        if (max_workload == 0 and next_present == presents.items.len) break;
+        total_time += min_workload;
+        for (elves) |e| {
+            if (e.workload != 0) {
+                e.subtractTime(min_workload);
+            }
+            if (e.workload == 0 and next_present < presents.items.len) {
+                e.getNewWorkload(presents.items[next_present]);
+                next_present += 1;
+            }
+        }
     }
 
-    // reverse to correct order
-    const out = try allocator.alloc(u8, i);
-    for (out, 0..) |*d, j| {
-        d.* = tmp[i - 1 - j];
-    }
-    return out;
+    std.debug.print("Total Time: {}", .{total_time});
 }
 
+fn minInt(nums: []usize, max_int: usize) usize {
+    var min = max_int;
+    if (min == 0) {
+        return min;
+    }
+    for (nums[0..]) |n| {
+        if (n < min and n > 0) min = n;
+    }
+    return min;
+}
+
+fn maxInt(nums: []usize) usize {
+    var max = nums[0];
+    for (nums[1..]) |n| {
+        if (n > max) max = n;
+    }
+    return max;
+}
 ```
 
 </details>
