@@ -112,6 +112,22 @@ export class SerialTerminal {
   ) {
     this.term.loadAddon(this.fit);
     this.term.open(element);
+    // Ctrl+Shift+C and Ctrl+Shift+V copy and paste, as in VS Code's and
+    // Linux terminals, where Ctrl+C and Ctrl+V go to the program
+    this.term.attachCustomKeyEventHandler((event) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey)
+        return true;
+      if (event.code === "KeyC") {
+        // Also keeps Chrome from opening its element inspector
+        event.preventDefault();
+        if (event.type === "keydown" && this.term.hasSelection())
+          void navigator.clipboard.writeText(this.term.getSelection());
+        return false;
+      }
+      // Left to the browser, which pastes into xterm's textarea, so this
+      // needs no clipboard permission
+      return event.code !== "KeyV";
+    });
     this.term.onData((data) => {
       counter.activity();
       vm.serial_send_bytes(port, encoder.encode(data));
