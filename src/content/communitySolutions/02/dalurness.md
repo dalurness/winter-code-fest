@@ -7,7 +7,7 @@ descriptions: ["golang", "zig", "gleam"]
 <details>
 <summary>Show Golang Solution</summary>
 
-```golang
+```go
 package main
 
 import (
