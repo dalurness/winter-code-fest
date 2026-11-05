@@ -1,6 +1,90 @@
 ---
-descriptions: ["zig", "gleam"]
+descriptions: ["zig", "gleam", "go"]
 ---
+
+### 2026 Solution Go
+
+<details>
+<summary>Show Go Solution</summary>
+
+### Output
+
+```
+Valid Codes: 14
+Added: 355 Removed: 174
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+	"strings"
+	"regexp"
+)
+
+func main() {
+	content, err := os.ReadFile("../days/03/assembly_codes.txt")
+	if err != nil {
+		log.Fatalf("Failed to open file: %w", err)
+	}
+
+	validNum := 0
+	codes := strings.Split(string(content), "\n")
+
+
+	re, err := regexp.Compile("^[AR]*CP$")
+	if err != nil {
+		log.Fatalf("Failed to compile regex")
+	}
+	reMix, err := regexp.Compile("^.*[CA][RP]$")
+	if err != nil {
+		log.Fatalf("Failed to compile regex")
+	}
+
+	added := 0
+	removed := 0
+
+	codeReviewLoop: for _, code := range codes {
+		code = strings.TrimSpace(code)
+		mixedUp := false
+		if !re.Match([]byte(code)) {
+			if reMix.Match([]byte(code)) {
+				mixedUp = true
+			} else {
+				continue
+			}
+		}
+
+		evenCount := 0
+		actions := code[0:len(code)-2]
+
+		for _, c := range actions {
+			if c == 'A' || c == 'C' {
+				evenCount += 1
+				added += 1
+			} else if c == 'R' || c == 'P' {
+				evenCount -= 1
+				removed += 1
+			}
+
+			if evenCount < 0 {
+				goto codeReviewLoop
+			}
+		}
+		if !mixedUp {
+		validNum += 1
+		}
+	}
+
+	fmt.Printf("Valid Codes: %d\n", validNum)
+	fmt.Printf("Added: %d Removed: %d\n", added, removed)
+}
+```
+
+</details>
 
 ### 2025 Solution Zig
 
