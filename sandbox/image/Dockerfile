@@ -81,7 +81,9 @@ RUN printf '%s\n' \
       'export PS1="\w \$ "' \
       'cd /workspace' >> /root/.profile
 
-COPY --chmod=755 sb sb-agent /usr/local/bin/
+COPY --chmod=755 sb sb-agent sb-copy /usr/local/bin/
+# Copy to the browser's clipboard under the names people already type
+RUN for name in wl-copy xclip xsel pbcopy; do ln -s sb-copy /usr/local/bin/$name; done
 # sb subtracts estimates of what is not the program from its instruction counts:
 # - sb-empty only exits, linked against libc like most programs, for the cost
 #   of starting and ending a process

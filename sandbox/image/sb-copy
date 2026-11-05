@@ -1,0 +1,51 @@
+#!/bin/sh
+# Copies text to the browser's clipboard. Also installed as wl-copy, xclip,
+# xsel and pbcopy, so their usual forms work:
+#
+#   echo hi | wl-copy        wl-copy some text        wl-copy -n < file
+#   xclip -sel clip file     xsel -b < file           pbcopy < file
+#
+# It sends the text to the terminal as an OSC 52 escape sequence, as tmux and
+# Neovim do, and the page puts it on the clipboard. There is no paste: the
+# page would need permission to read the clipboard.
+name=$(basename "$0")
+trim=
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o | --output | -out | -p | --paste)
+      echo "$name: the sandbox can copy to the clipboard, but not paste" >&2
+      exit 1 ;;
+    -n | --trim-newline) trim=1 ;;
+    # Options of xclip and wl-copy that take a value
+    -sel | -selection | -t | -target | -type | --type | -s | --seat | -l | -loops | -d | -display) shift ;;
+    --) shift; break ;;
+    # -b, -i, -c, --clipboard and the like change nothing here
+    -*) ;;
+    *) break ;;
+  esac
+  shift
+done
+
+text() {
+  if [ $# -eq 0 ]; then
+    cat
+  elif [ "$name" = xclip ]; then
+    # xclip reads its arguments as files
+    cat -- "$@"
+  else
+    # wl-copy copies its arguments
+    printf '%s' "$*"
+  fi
+}
+
+if [ -n "$trim" ]; then
+  # $(...) drops the trailing newlines
+  data=$(printf '%s' "$(text "$@")" | base64 | tr -d '\n')
+else
+  data=$(text "$@" | base64 | tr -d '\n')
+fi
+
+# To the terminal itself, so it still arrives when output is redirected
+printf '\033]52;c;%s\007' "$data" 2>/dev/null > /dev/tty ||
+  printf '\033]52;c;%s\007' "$data" >&2

@@ -20,6 +20,35 @@ const ESCAPES = /\x1b\[[0-9;?]*[A-Za-z]/g;
 const MARKER = "\x1b]7771;";
 
 const encoder = new TextEncoder();
+
+/** Text a terminal asked to copy, waiting for a click because the browser refused */
+let pendingCopy: string | undefined;
+
+/**
+ * Puts text from the guest on the clipboard. Firefox only allows that right
+ * after a click or key press, and Chrome while the page has focus, so when it
+ * is refused the next click in the page copies it instead.
+ */
+function copyFromGuest(text: string, status: (text: string) => void) {
+  navigator.clipboard.writeText(text).catch(() => {
+    if (pendingCopy === undefined) {
+      document.addEventListener(
+        "pointerdown",
+        () => {
+          const text = pendingCopy!;
+          pendingCopy = undefined;
+          navigator.clipboard.writeText(text).then(
+            () => status("Copied to the clipboard"),
+            () => status("The browser didn't allow copying to the clipboard")
+          );
+        },
+        { once: true, capture: true }
+      );
+    }
+    pendingCopy = text;
+    status("Click anywhere to copy what the terminal sent to the clipboard");
+  });
+}
 const compact = new Intl.NumberFormat("en", {
   notation: "compact",
   maximumSignificantDigits: 4,
@@ -108,10 +137,25 @@ export class SerialTerminal {
     private vm: Emulator,
     private port: 0 | 1,
     readonly element: HTMLElement,
-    private counter: InstructionCounter
+    private counter: InstructionCounter,
+    status: (text: string) => void
   ) {
     this.term.loadAddon(this.fit);
     this.term.open(element);
+    // OSC 52 copies to the clipboard: ESC ] 52 ; c ; BASE64 BEL. The image's
+    // wl-copy, xclip, xsel and pbcopy send it, and so can tmux and Neovim.
+    // Reading the clipboard ("?" instead of the text) isn't supported.
+    this.term.parser.registerOscHandler(52, (data) => {
+      const base64 = data.slice(data.indexOf(";") + 1);
+      if (base64 === "?") return true;
+      try {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        copyFromGuest(new TextDecoder().decode(bytes), status);
+      } catch {
+        // Not base64; ignored like any unknown sequence
+      }
+      return true;
+    });
     // Ctrl+Shift+C and Ctrl+Shift+V copy and paste, as in VS Code's and
     // Linux terminals, where Ctrl+C and Ctrl+V go to the program
     this.term.attachCustomKeyEventHandler((event) => {

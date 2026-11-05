@@ -124,8 +124,8 @@ const sync = new GuestSync(vm, onGuestChange);
 files.onStaged = (path) => sync.saved(path);
 const counter = new InstructionCounter(vm);
 const terms = [
-  new SerialTerminal(vm, 0, $("term0"), counter),
-  new SerialTerminal(vm, 1, $("term1"), counter),
+  new SerialTerminal(vm, 0, $("term0"), counter, setStatus),
+  new SerialTerminal(vm, 1, $("term1"), counter, setStatus),
 ] as const;
 let activeTerm: SerialTerminal = terms[0];
 terms.forEach((t) =>
