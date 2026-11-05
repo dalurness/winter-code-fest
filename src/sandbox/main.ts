@@ -177,6 +177,15 @@ const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
   onFocusChange: "Auto Save: On Focus Change",
 };
 
+/** Markdown and other files each have their own Word Wrap setting */
+function wordWrap() {
+  const language = editor.getModel()?.getLanguageId() ?? "";
+  const wrap = ["markdown", "mdx"].includes(language)
+    ? settings.markdownWordWrap
+    : settings.wordWrap;
+  return wrap ? "on" : "off";
+}
+
 function applySettings() {
   const theme = resolveTheme(settings.theme);
   document.documentElement.dataset["theme"] = theme;
@@ -193,7 +202,7 @@ function applySettings() {
   terms.forEach((t) => t.setTheme(TERMINAL_THEMES[theme]));
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
-    wordWrap: settings.wordWrap ? "on" : "off",
+    wordWrap: wordWrap(),
     minimap: { enabled: settings.minimap, showSlider: "always" },
     fontSize: settings.fontSize,
   });
@@ -207,6 +216,7 @@ function applySettings() {
   for (const name of [
     "renderWhitespace",
     "wordWrap",
+    "markdownWordWrap",
     "minimap",
     "showAllFiles",
   ] as const) {
@@ -553,6 +563,7 @@ function activate(path: string | undefined, { focus = true } = {}) {
   active = path;
   const file = fileAt(path);
   editor.setModel(file?.model ?? null);
+  editor.updateOptions({ wordWrap: wordWrap() });
   if (file?.viewState) editor.restoreViewState(file.viewState);
   for (const [key, tab] of open) {
     if (isPage(tab)) tab.frame.hidden = key !== path;
