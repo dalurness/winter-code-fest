@@ -1,6 +1,11 @@
 // Monarch grammars for languages Monaco does not ship: Zig, Gleam, Erlang,
 // Clank, TOML, Makefile and GNU assembler. Highlighting only, no language features.
 import * as monaco from "monaco-editor";
+import {
+  CONSTANTS as clankConstants,
+  KEYWORDS as clankKeywords,
+  RULES as clankRules,
+} from "../highlight/clank";
 
 type Grammar = monaco.languages.IMonarchLanguage;
 
@@ -125,23 +130,16 @@ const erlang: Grammar = {
   },
 };
 
-// https://github.com/dalurness/clank, after its SPEC.md. Identifiers may
-// contain dashes (flat-map), as in Clank itself, so minus needs spaces.
+// Built from the same rules as the site's TextMate grammar
 const clank: Grammar = {
-  // prettier-ignore
-  keywords: [
-    "let", "in", "fn", "if", "then", "else", "match", "do", "type", "effect",
-    "affine", "handle", "resume", "perform", "mod", "use", "pub", "clone",
-    "interface", "impl", "deriving", "where", "opaque", "return", "test",
-    "alias", "discard", "for", "fold",
-  ],
-  constants: ["true", "false"],
+  keywords: clankKeywords,
+  constants: clankConstants,
   tokenizer: {
     root: [
-      [/#.*$/, "comment"],
-      [/[A-Z][\w]*/, "type.identifier"],
+      [clankRules.comment, "comment"],
+      [clankRules.type, "type.identifier"],
       [
-        /[a-z_][\w-]*/,
+        clankRules.identifier,
         {
           cases: {
             "@keywords": "keyword",
@@ -150,20 +148,22 @@ const clank: Grammar = {
           },
         },
       ],
-      // Effect rows: <>, <io>, <exn[E], async>
-      [/<>|<[a-z][\w[\], ]*>/, "annotation"],
-      [/\d+(\.\d+)?([eE][+-]?\d+)?/, "number"],
-      [/"/, "string", "@string"],
-      [/[{}()[\]]/, "@brackets"],
-      [/\|>|->|=>|\+\+|\.\.|[=<>!+\-*/%&|:]+/, "operator"],
+      [clankRules.effectRow, "annotation"],
+      [clankRules.number, "number"],
+      [clankRules.quote, "string", "@string"],
+      [clankRules.bracket, "@brackets"],
+      [clankRules.operator, "operator"],
     ],
     string: [
-      [/\$\{/, "delimiter.bracket", "@interpolation"],
-      [/\\(u\{[\da-fA-F]+\}|x[\da-fA-F]{2}|.)/, "string.escape"],
-      [/"/, "string", "@pop"],
+      [clankRules.interpolationStart, "delimiter.bracket", "@interpolation"],
+      [clankRules.escape, "string.escape"],
+      [clankRules.quote, "string", "@pop"],
       [/[^\\"$]+|\$/, "string"],
     ],
-    interpolation: [[/\}/, "delimiter.bracket", "@pop"], { include: "root" }],
+    interpolation: [
+      [clankRules.interpolationEnd, "delimiter.bracket", "@pop"],
+      { include: "root" },
+    ],
   },
 };
 
