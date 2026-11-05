@@ -1047,6 +1047,11 @@ function showMenu(items: MenuItem[], event: MouseEvent) {
 
 const hideMenu = () => (ui.contextMenu.hidden = true);
 
+const copyItems = (path: string): MenuItem[] => [
+  ["Copy Name", () => void navigator.clipboard.writeText(baseName(path))],
+  ["Copy Path", () => void navigator.clipboard.writeText(path)],
+];
+
 function showTabMenu(path: string, event: MouseEvent) {
   const file = open.get(path)!;
   const paths = [...open.keys()];
@@ -1081,18 +1086,14 @@ function showTabMenu(path: string, event: MouseEvent) {
     ["Close All", () => closeFiles(paths)]
   );
   if (isFile(file)) {
-    items.push(
-      "separator",
-      ["Copy Path", () => void navigator.clipboard.writeText(path)],
-      [
-        "Reveal in Explorer",
-        () => {
-          showSidebar(true);
-          reveal(path);
-          renderTree();
-        },
-      ]
-    );
+    items.push("separator", ...copyItems(path), [
+      "Reveal in Explorer",
+      () => {
+        showSidebar(true);
+        reveal(path);
+        renderTree();
+      },
+    ]);
   }
   showMenu(items, event);
 }
@@ -1411,11 +1412,14 @@ ui.tree.addEventListener("contextmenu", (event) => {
   const row = (event.target as Element).closest<HTMLElement>(".row[data-path]");
   if (!row) return;
   event.preventDefault();
-  const dir = row.dataset["dir"] ?? dirName(row.dataset["path"]!);
+  const path = row.dataset["path"]!;
+  const dir = row.dataset["dir"] ?? dirName(path);
   showMenu(
     [
       ["New File…", () => newEntry("file", dir)],
       ["New Folder…", () => newEntry("dir", dir)],
+      "separator",
+      ...copyItems(path),
     ],
     event
   );
@@ -1897,6 +1901,9 @@ function cycleTab(step: number) {
  * Handled in the capture phase so they work from the editor and the terminals
  * too, as in VS Code.
  */
+const inTerminal = (event: Event) =>
+  event.target instanceof Element && !!event.target.closest(".xterm");
+
 function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
   const ctrl = event.ctrlKey || event.metaKey;
   const { shiftKey: shift, altKey: alt, code } = event;
@@ -1917,7 +1924,9 @@ function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
     if (code === "ArrowDown" && shift) return () => resizePanel(-40);
     if (code === "KeyB" && !shift) return () => showSidebar();
     if (code === "KeyE" && shift) return focusExplorer;
-    if (code === "KeyV" && shift) return () => togglePreview();
+    // In a terminal it pastes instead, see SerialTerminal
+    if (code === "KeyV" && shift && !inTerminal(event))
+      return () => togglePreview();
     if (code === "Comma") return openSettings;
     if ((code === "KeyW" && !shift) || code === "F4")
       return () => active && closeFiles([active]);
