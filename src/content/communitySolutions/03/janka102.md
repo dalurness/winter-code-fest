@@ -1,8 +1,74 @@
 ---
-descriptions: ["ruby"]
+descriptions: ["ruby", "go"]
 ---
 
+## 2026
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"log"
+	"os"
+)
+
+func main() {
+	file, err := os.Open("/workspace/days/03/assembly_codes.txt")
+	defer file.Close()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	scanner := bufio.NewScanner(bufio.NewReader(file))
+
+	valid, added, removed := 0, 0, 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		invalid := false
+
+		// Must end with "CP"
+		if line[len(line)-2:] != "CP" {
+			invalid = true
+		}
+
+		// Last two chars don't matter anymore after checking above
+		for _, c := range line[:len(line)-2] {
+			// Both A and C are added, but C makes it invalid
+			// Both R and P are removed, but P makes it invalid
+			switch c {
+			case 'C':
+				invalid = true
+				fallthrough
+			case 'A':
+				added++
+			case 'P':
+				invalid = true
+				fallthrough
+			case 'R':
+				removed++
+			}
+		}
+
+		if !invalid {
+			valid++
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Invalid input: %s\n", err)
+	}
+
+	fmt.Printf("Valid: %d\n", valid)
+	fmt.Printf("Added: %d, Removed: %d\n", added, removed)
+}
+```
+
 ## 2025
+
+<details>
+<summary>Show Ruby Solution</summary>
 
 Ok maybe RuboCop is a little weird, it changes `if c == 'A' || c == 'C'` to `if %w[A C].include?(c)` and `self.part1` to `part1`.
 
@@ -90,3 +156,5 @@ if __FILE__ == $PROGRAM_NAME
   challenge.solve options
 end
 ```
+
+</details>

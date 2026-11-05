@@ -627,6 +627,50 @@ const isAfter = (event: DragEvent, tab: HTMLElement) => {
   return event.clientX > left + width / 2;
 };
 
+/**
+ * Tab elements by path, kept across renders. Rebuilding them would break a
+ * click when a save re-renders between its mousedown and mouseup, which an
+ * auto save on focus change does as soon as the editor loses focus.
+ */
+const tabElements = new Map<string, HTMLElement>();
+
+function createTab(path: string) {
+  const tab = document.createElement("div");
+  tab.role = "tab";
+  tab.onclick = () => activate(path);
+  // Middle click closes, like VS Code
+  tab.onauxclick = (event) => event.button === 1 && closeFiles([path]);
+  tab.oncontextmenu = (event) => {
+    event.preventDefault();
+    showTabMenu(path, event);
+  };
+
+  // Drag to reorder, like VS Code
+  tab.draggable = true;
+  tab.ondragstart = (event) => {
+    draggedTab = path;
+    event.dataTransfer!.effectAllowed = "move";
+    tab.classList.add("dragging");
+  };
+  tab.ondragend = () => {
+    draggedTab = undefined;
+    renderTabs();
+  };
+  tab.ondragover = (event) => {
+    if (!draggedTab) return;
+    event.preventDefault();
+    const after = isAfter(event, tab);
+    tab.classList.toggle("drop-before", !after);
+    tab.classList.toggle("drop-after", after);
+  };
+  tab.ondragleave = () => tab.classList.remove("drop-before", "drop-after");
+  tab.ondrop = (event) => {
+    event.preventDefault();
+    if (draggedTab) moveTab(draggedTab, path, isAfter(event, tab));
+  };
+  return tab;
+}
+
 function renderTabs() {
   // Show the parent folder on tabs that share a name, like VS Code
   const counts = new Map<string, number>();
@@ -636,85 +680,67 @@ function renderTabs() {
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
 
-  ui.tabs.replaceChildren(
-    ...[...open].map(([path, file]) => {
-      const tab = document.createElement("div");
-      tab.className = "tab";
-      tab.role = "tab";
-      tab.title = isPage(file) ? file.url : isFile(file) ? path : "Settings";
-      tab.classList.toggle("active", path === active);
-      tab.classList.toggle("dirty", isDirty(file));
-      tab.classList.toggle("conflict", isFile(file) && file.conflict);
-      tab.setAttribute("aria-selected", String(path === active));
+  for (const path of tabElements.keys())
+    if (!open.has(path)) tabElements.delete(path);
 
-      const name = document.createElement("span");
-      name.textContent = isPage(file)
-        ? file.title
-        : !isFile(file)
-          ? "Settings"
-          : isMarkdown(file) && file.preview
-            ? `Preview ${baseName(path)}`
-            : baseName(path);
-      tab.append(
-        badge(
-          isPage(file)
-            ? "page.html"
-            : isFile(file)
-              ? baseName(path)
-              : "Settings"
-        ),
-        name
-      );
-      if (isFile(file) && (counts.get(baseName(path)) ?? 0) > 1) {
-        const description = document.createElement("span");
-        description.className = "description";
-        description.textContent = baseName(dirName(path));
-        tab.append(description);
-      }
+  const tabs = [...open].map(([path, file]) => {
+    let tab = tabElements.get(path);
+    if (!tab) tabElements.set(path, (tab = createTab(path)));
+    tab.className = "tab";
+    tab.title = isPage(file) ? file.url : isFile(file) ? path : "Settings";
+    tab.classList.toggle("active", path === active);
+    tab.classList.toggle("dirty", isDirty(file));
+    tab.classList.toggle("conflict", isFile(file) && file.conflict);
+    tab.setAttribute("aria-selected", String(path === active));
 
-      const close = document.createElement("button");
-      close.className = "close";
-      close.title = "Close (Alt+W)";
-      close.onclick = (event) => {
-        event.stopPropagation();
-        closeFiles([path]);
-      };
-      tab.append(close);
+    const label = isPage(file)
+      ? file.title
+      : !isFile(file)
+        ? "Settings"
+        : isMarkdown(file) && file.preview
+          ? `Preview ${baseName(path)}`
+          : baseName(path);
+    const icon = isPage(file)
+      ? "page.html"
+      : isFile(file)
+        ? baseName(path)
+        : "Settings";
+    const description =
+      isFile(file) && (counts.get(baseName(path)) ?? 0) > 1
+        ? baseName(dirName(path))
+        : "";
+    // Only rebuild the contents when they change, so the close button
+    // under the pointer stays the same element too
+    const key = JSON.stringify([label, icon, description]);
+    if (tab.dataset.key === key) return tab;
+    tab.dataset.key = key;
 
-      tab.onclick = () => activate(path);
-      // Middle click closes, like VS Code
-      tab.onauxclick = (event) => event.button === 1 && closeFiles([path]);
-      tab.oncontextmenu = (event) => {
-        event.preventDefault();
-        showTabMenu(path, event);
-      };
+    const name = document.createElement("span");
+    name.textContent = label;
+    tab.replaceChildren(badge(icon), name);
+    if (description) {
+      const span = document.createElement("span");
+      span.className = "description";
+      span.textContent = description;
+      tab.append(span);
+    }
 
-      // Drag to reorder, like VS Code
-      tab.draggable = true;
-      tab.ondragstart = (event) => {
-        draggedTab = path;
-        event.dataTransfer!.effectAllowed = "move";
-        tab.classList.add("dragging");
-      };
-      tab.ondragend = () => {
-        draggedTab = undefined;
-        renderTabs();
-      };
-      tab.ondragover = (event) => {
-        if (!draggedTab) return;
-        event.preventDefault();
-        const after = isAfter(event, tab);
-        tab.classList.toggle("drop-before", !after);
-        tab.classList.toggle("drop-after", after);
-      };
-      tab.ondragleave = () => tab.classList.remove("drop-before", "drop-after");
-      tab.ondrop = (event) => {
-        event.preventDefault();
-        if (draggedTab) moveTab(draggedTab, path, isAfter(event, tab));
-      };
-      return tab;
-    })
-  );
+    const close = document.createElement("button");
+    close.className = "close";
+    close.title = "Close (Alt+W)";
+    close.onclick = (event) => {
+      event.stopPropagation();
+      closeFiles([path]);
+    };
+    tab.append(close);
+    return tab;
+  });
+  // Moving a tab out of the DOM and back would break a click on it too
+  if (tabs.some((tab, i) => ui.tabs.children[i] !== tab))
+    ui.tabs.replaceChildren(...tabs);
+  else
+    for (const extra of [...ui.tabs.children].slice(tabs.length))
+      extra.remove();
   ui.tabs.querySelector(".active")?.scrollIntoView({ block: "nearest" });
   ui.empty.hidden = open.size > 0;
 
