@@ -5,34 +5,10 @@ import type { APIRoute } from "astro";
 import { getCollection } from "astro:content";
 import { readdirSync, statSync } from "node:fs";
 import type { ContentFile } from "../../sandbox/content";
-
-/** Code block languages used in solutions, and the file extension for each */
-const EXTENSIONS: Record<string, string> = {
-  asm: "s",
-  c: "c",
-  clank: "clk",
-  cpp: "cpp",
-  deno: "ts",
-  elixir: "exs",
-  erlang: "erl",
-  gleam: "gleam",
-  go: "go",
-  js: "js",
-  lua: "lua",
-  perl: "pl",
-  php: "php",
-  python: "py",
-  ruby: "rb",
-  rust: "rs",
-  sh: "sh",
-  bash: "sh",
-  ts: "ts",
-  typescript: "ts",
-  zig: "zig",
-};
-
-/** Fenced code blocks with a language: ```ruby ... ``` */
-const CODE_BLOCK = /^```(\w+)[^\n]*\n([\s\S]*?)^```/gm;
+import {
+  codeBlocks,
+  unsupportedBlocks,
+} from "../../sandbox/solution-languages";
 
 export const GET: APIRoute = async () => {
   const files: ContentFile[] = [];
@@ -65,13 +41,19 @@ export const GET: APIRoute = async () => {
 
     // Each code block also becomes its own file: solution.rb, solution-2.rb
     const counts = new Map<string, number>();
-    for (const [, language = "", code = ""] of body.matchAll(CODE_BLOCK)) {
-      const extension = EXTENSIONS[language.toLowerCase()];
+    for (const { extension, code } of codeBlocks(body)) {
       if (!extension) continue;
       const count = (counts.get(extension) ?? 0) + 1;
       counts.set(extension, count);
       const suffix = count === 1 ? "" : `-${count}`;
       files.push({ path: `${dir}/solution${suffix}.${extension}`, text: code });
+    }
+
+    // The PR check fails on these; this catches anything merged around it
+    for (const { language } of unsupportedBlocks(body)) {
+      console.warn(
+        `Sandbox: no file for \`\`\`${language} code blocks in ${entry.id}; see scripts/check-solution-languages.ts`
+      );
     }
   }
 

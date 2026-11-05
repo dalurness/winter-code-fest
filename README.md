@@ -24,6 +24,16 @@ Some feats to date:
 
 Once you have completed a question, submit your answer with a PR to this repo! The solutions belong in `/src/content/communitySolutions`.**Set the name of the file to your GitHub username**. Include descriptions (look at an example of someone else's submission) along with your code and then we will merge it to start showing on the site.
 
+Put your code in fenced code blocks tagged with its language. The [sandbox](https://dalurness.github.io/winter-code-fest/sandbox/) turns each block into a file you can run, but only for these tags (case doesn't matter):
+
+`asm`, `bash`, `c`, `clank`, `cpp`, `deno`, `elixir`, `erlang`, `gleam`, `go`, `js`, `lua`, `perl`, `php`, `python`, `ruby`, `rust`, `sh`, `ts`, `typescript`, `zig`
+
+Solutions in any other language are still welcome. They show up on the site, just not as runnable files in the sandbox. A check on your pull request fails for any other tag, to catch typos like `golang`; if the language really isn't supported, add a comment like this anywhere in your file to acknowledge it (separate several languages with commas):
+
+```md
+<!-- sandbox-unsupported: excel -->
+```
+
 ## Contributing
 
 We would love your help on this project! Whether you want to add a question, put a little more flair to the site styles, or modify a question to come to a more checkable solution, we appreciate the help. Head over to the [contributing file](/CONTRIBUTING.md).
