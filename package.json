@@ -10,6 +10,7 @@
     "astro": "astro",
     "format": "prettier --write --list-different ./",
     "format:check": "prettier --check ./",
+    "check:solutions": "node scripts/check-solution-languages.ts",
     "sandbox:image": "./sandbox/image/build.sh",
     "sandbox:state": "node sandbox/scripts/build-state.ts"
   },
