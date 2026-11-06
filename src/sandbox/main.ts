@@ -14,6 +14,13 @@ import {
 } from "./settings";
 import { GuestSync, type GuestChanges } from "./sync";
 import { SerialTerminal, TERMINAL_THEMES } from "./terminal";
+import {
+  saveUsername,
+  savedUsername,
+  submission,
+  tagFor,
+  validUsername,
+} from "./submit";
 import { contextOf, WorkCache } from "./work-cache";
 import {
   createVm,
@@ -27,6 +34,11 @@ const $ = <T extends HTMLElement>(id: string) =>
 const ui = {
   run: $<HTMLButtonElement>("run"),
   bench: $<HTMLButtonElement>("bench"),
+  submit: $<HTMLButtonElement>("submit"),
+  submitDialog: $<HTMLDialogElement>("submit-dialog"),
+  submitFile: $("submit-file"),
+  submitDay: $("submit-day"),
+  submitUsername: $<HTMLInputElement>("submit-username"),
   reset: $<HTMLButtonElement>("reset"),
   settingsButton: $<HTMLButtonElement>("settings-button"),
   explorerToggle: $<HTMLButtonElement>("explorer-toggle"),
@@ -102,6 +114,8 @@ const settings = loadSettings();
 const params = new URLSearchParams(location.search);
 /** Edited files, kept across reloads for the day the sandbox was opened for */
 const work = new WorkCache(contextOf(params));
+/** The day the sandbox was opened for, which Submit sends solutions to */
+const submitDay = params.get("day")?.padStart(2, "0");
 work.onFull = () =>
   setStatus("Browser storage is full; recent edits won't survive a reload");
 const started = performance.now();
@@ -1816,7 +1830,46 @@ function updateRunButton() {
   ui.bench.title = canRun(active)
     ? `Run ${baseName(active)} ${settings.benchRuns} more times without output and count the VM's instructions (Ctrl+Shift+Enter)`
     : "Open a source file to benchmark it";
+  ui.submit.disabled = !ready || !submittable(active);
+  ui.submit.title = submittable(active)
+    ? `Open a pull request on GitHub with ${baseName(active)} as your day ${submitDay} solution`
+    : "Open a source file to submit it";
 }
+
+// --- Submit --------------------------------------------------------------
+
+ui.submit.hidden = !submitDay;
+
+const submittable = (path: string | undefined): path is string =>
+  !!submitDay && canRun(path) && !!tagFor(path);
+
+function openSubmit() {
+  if (!submittable(active)) return;
+  ui.submitFile.textContent = baseName(active);
+  ui.submitDay.textContent = String(Number(submitDay));
+  ui.submitUsername.value = savedUsername();
+  ui.submitDialog.showModal();
+}
+
+ui.submitDialog.onclose = () => {
+  const path = active;
+  if (ui.submitDialog.returnValue !== "go" || !submittable(path)) return;
+  const username = ui.submitUsername.value.trim();
+  if (!validUsername(username)) return;
+  saveUsername(username);
+  const { url, clipboard, message } = submission({
+    day: submitDay!,
+    username,
+    code: fileAt(path)?.model.getValue() ?? "",
+    tag: tagFor(path)!,
+    // Merged solutions are in the VM, with the name as the folder
+    exists: files.exists(`${DAYS_DIR}/${submitDay}/solutions/${username}`),
+  });
+  // Both while the click still counts as the user's, which they need
+  if (clipboard) void navigator.clipboard.writeText(clipboard);
+  window.open(url, "_blank", "noopener");
+  setStatus(message);
+};
 
 /**
  * Runs the open file. Every run counts the instructions the VM ran for the
@@ -1909,6 +1962,7 @@ async function openSecondTerminal() {
 
 ui.run.onclick = () => run();
 ui.bench.onclick = () => run({ bench: true });
+ui.submit.onclick = openSubmit;
 ui.refresh.onclick = refresh;
 ui.reset.onclick = reset;
 ui.split.onclick = openSecondTerminal;

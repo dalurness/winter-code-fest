@@ -1126,3 +1126,45 @@ button.icon svg {
     font-size: 0;
   }
 }
+
+/* Submit: GitHub username, before opening the pull request page */
+.submit-dialog {
+  width: min(440px, calc(100% - 32px));
+  padding: 16px 20px;
+  color: inherit;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+
+.submit-dialog::backdrop {
+  background: #0006;
+}
+
+.submit-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.submit-dialog p {
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.submit-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.submit-dialog input {
+  padding: 4px 8px;
+}
+
+.submit-dialog .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
