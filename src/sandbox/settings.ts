@@ -8,7 +8,9 @@ export interface Settings {
   theme: Theme;
   autoSave: AutoSave;
   renderWhitespace: boolean;
+  /** In files other than Markdown */
   wordWrap: boolean;
+  markdownWordWrap: boolean;
   minimap: boolean;
   /** Show the whole VM filesystem in the explorer, not just /workspace and /tmp */
   showAllFiles: boolean;
@@ -37,6 +39,8 @@ const DEFAULTS: Settings = {
   autoSave: "off",
   renderWhitespace: false,
   wordWrap: false,
+  // Prose reads better wrapped, as in VS Code
+  markdownWordWrap: true,
   minimap: false,
   showAllFiles: false,
   fontSize: 14,

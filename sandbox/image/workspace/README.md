@@ -8,3 +8,4 @@ A small Linux VM running in your browser, with no network. Everything here is lo
 - Starter projects: `node` (TypeScript), `go`, `ruby`, `python`, `rust`, `c`, `cpp`, `zig`, `gleam`, `elixir`, `erlang`, `lua`, `php`, `perl`, `clank` (its whole spec is in `clank/SPEC.md`), `asm` (x86, AT&T syntax) and `bash`.
 - `/tmp` is a good place for scratch files.
 - The editor and the terminals see each other's changes as they happen: a saved file is ready in the terminal, and files a program writes show up in the editor.
+- `wl-copy` copies to your clipboard and `wl-paste` pastes from it, as in `ls | wl-copy` or `wl-paste > notes.txt`. `xclip`, `xsel`, `pbcopy` and `pbpaste` work too. Ctrl+Shift+C and Ctrl+Shift+V copy and paste in the terminals.

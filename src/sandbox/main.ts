@@ -29,6 +29,7 @@ const ui = {
   bench: $<HTMLButtonElement>("bench"),
   reset: $<HTMLButtonElement>("reset"),
   settingsButton: $<HTMLButtonElement>("settings-button"),
+  explorerToggle: $<HTMLButtonElement>("explorer-toggle"),
   settings: $<HTMLFormElement>("settings"),
   workbench: $("workbench"),
   main: $("main"),
@@ -124,8 +125,8 @@ const sync = new GuestSync(vm, onGuestChange);
 files.onStaged = (path) => sync.saved(path);
 const counter = new InstructionCounter(vm);
 const terms = [
-  new SerialTerminal(vm, 0, $("term0"), counter),
-  new SerialTerminal(vm, 1, $("term1"), counter),
+  new SerialTerminal(vm, 0, $("term0"), counter, setStatus),
+  new SerialTerminal(vm, 1, $("term1"), counter, setStatus),
 ] as const;
 let activeTerm: SerialTerminal = terms[0];
 terms.forEach((t) =>
@@ -177,6 +178,15 @@ const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
   onFocusChange: "Auto Save: On Focus Change",
 };
 
+/** Markdown and other files each have their own Word Wrap setting */
+function wordWrap() {
+  const language = editor.getModel()?.getLanguageId() ?? "";
+  const wrap = ["markdown", "mdx"].includes(language)
+    ? settings.markdownWordWrap
+    : settings.wordWrap;
+  return wrap ? "on" : "off";
+}
+
 function applySettings() {
   const theme = resolveTheme(settings.theme);
   document.documentElement.dataset["theme"] = theme;
@@ -193,7 +203,7 @@ function applySettings() {
   terms.forEach((t) => t.setTheme(TERMINAL_THEMES[theme]));
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
-    wordWrap: settings.wordWrap ? "on" : "off",
+    wordWrap: wordWrap(),
     minimap: { enabled: settings.minimap, showSlider: "always" },
     fontSize: settings.fontSize,
   });
@@ -207,6 +217,7 @@ function applySettings() {
   for (const name of [
     "renderWhitespace",
     "wordWrap",
+    "markdownWordWrap",
     "minimap",
     "showAllFiles",
   ] as const) {
@@ -551,8 +562,11 @@ function activate(path: string | undefined, { focus = true } = {}) {
   }
 
   active = path;
+  // Opening a file on a phone shows it instead of the explorer
+  if (narrow.matches) ui.workbench.classList.remove("sidebar-open");
   const file = fileAt(path);
   editor.setModel(file?.model ?? null);
+  editor.updateOptions({ wordWrap: wordWrap() });
   if (file?.viewState) editor.restoreViewState(file.viewState);
   for (const [key, tab] of open) {
     if (isPage(tab)) tab.frame.hidden = key !== path;
@@ -1047,6 +1061,11 @@ function showMenu(items: MenuItem[], event: MouseEvent) {
 
 const hideMenu = () => (ui.contextMenu.hidden = true);
 
+const copyItems = (path: string): MenuItem[] => [
+  ["Copy Name", () => void navigator.clipboard.writeText(baseName(path))],
+  ["Copy Path", () => void navigator.clipboard.writeText(path)],
+];
+
 function showTabMenu(path: string, event: MouseEvent) {
   const file = open.get(path)!;
   const paths = [...open.keys()];
@@ -1081,18 +1100,14 @@ function showTabMenu(path: string, event: MouseEvent) {
     ["Close All", () => closeFiles(paths)]
   );
   if (isFile(file)) {
-    items.push(
-      "separator",
-      ["Copy Path", () => void navigator.clipboard.writeText(path)],
-      [
-        "Reveal in Explorer",
-        () => {
-          showSidebar(true);
-          reveal(path);
-          renderTree();
-        },
-      ]
-    );
+    items.push("separator", ...copyItems(path), [
+      "Reveal in Explorer",
+      () => {
+        showSidebar(true);
+        reveal(path);
+        renderTree();
+      },
+    ]);
   }
   showMenu(items, event);
 }
@@ -1101,6 +1116,12 @@ document.addEventListener("pointerdown", (event) => {
   const target = event.target as Element;
   if (!target.closest(".context-menu")) hideMenu();
   if (!target.closest(".quick-open")) hideQuickOpen();
+  // Tapping beside the explorer on a phone closes it
+  if (
+    narrow.matches &&
+    !target.closest(".sidebar, #explorer-toggle, .context-menu")
+  )
+    ui.workbench.classList.remove("sidebar-open");
 });
 
 // --- Explorer ------------------------------------------------------------
@@ -1411,11 +1432,14 @@ ui.tree.addEventListener("contextmenu", (event) => {
   const row = (event.target as Element).closest<HTMLElement>(".row[data-path]");
   if (!row) return;
   event.preventDefault();
-  const dir = row.dataset["dir"] ?? dirName(row.dataset["path"]!);
+  const path = row.dataset["path"]!;
+  const dir = row.dataset["dir"] ?? dirName(path);
   showMenu(
     [
       ["New File…", () => newEntry("file", dir)],
       ["New Folder…", () => newEntry("dir", dir)],
+      "separator",
+      ...copyItems(path),
     ],
     event
   );
@@ -1716,9 +1740,19 @@ ui.quickOpenInput.onkeydown = (event) => {
 
 const root = document.documentElement.style;
 
-function showSidebar(show = ui.workbench.classList.contains("sidebar-hidden")) {
-  ui.workbench.classList.toggle("sidebar-hidden", !show);
+/** On a phone the explorer slides over the editor instead of sitting beside it */
+const narrow = matchMedia("(max-width: 700px)");
+
+function showSidebar(show?: boolean) {
+  if (narrow.matches) {
+    show ??= !ui.workbench.classList.contains("sidebar-open");
+    ui.workbench.classList.toggle("sidebar-open", show);
+  } else {
+    show ??= ui.workbench.classList.contains("sidebar-hidden");
+    ui.workbench.classList.toggle("sidebar-hidden", !show);
+  }
 }
+ui.explorerToggle.onclick = () => showSidebar();
 
 function showPanel(show = ui.main.classList.contains("panel-hidden")) {
   ui.main.classList.toggle("panel-hidden", !show);
@@ -1897,6 +1931,9 @@ function cycleTab(step: number) {
  * Handled in the capture phase so they work from the editor and the terminals
  * too, as in VS Code.
  */
+const inTerminal = (event: Event) =>
+  event.target instanceof Element && !!event.target.closest(".xterm");
+
 function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
   const ctrl = event.ctrlKey || event.metaKey;
   const { shiftKey: shift, altKey: alt, code } = event;
@@ -1917,7 +1954,9 @@ function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
     if (code === "ArrowDown" && shift) return () => resizePanel(-40);
     if (code === "KeyB" && !shift) return () => showSidebar();
     if (code === "KeyE" && shift) return focusExplorer;
-    if (code === "KeyV" && shift) return () => togglePreview();
+    // In a terminal it pastes instead, see SerialTerminal
+    if (code === "KeyV" && shift && !inTerminal(event))
+      return () => togglePreview();
     if (code === "Comma") return openSettings;
     if ((code === "KeyW" && !shift) || code === "F4")
       return () => active && closeFiles([active]);

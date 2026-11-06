@@ -20,6 +20,37 @@ const ESCAPES = /\x1b\[[0-9;?]*[A-Za-z]/g;
 const MARKER = "\x1b]7771;";
 
 const encoder = new TextEncoder();
+
+const MAX_PASTE_BYTES = 1e6;
+
+/** Text a terminal asked to copy, waiting for a click because the browser refused */
+let pendingCopy: string | undefined;
+
+/**
+ * Puts text from the guest on the clipboard. Firefox only allows that right
+ * after a click or key press, and Chrome while the page has focus, so when it
+ * is refused the next click in the page copies it instead.
+ */
+function copyFromGuest(text: string, status: (text: string) => void) {
+  navigator.clipboard.writeText(text).catch(() => {
+    if (pendingCopy === undefined) {
+      document.addEventListener(
+        "pointerdown",
+        () => {
+          const text = pendingCopy!;
+          pendingCopy = undefined;
+          navigator.clipboard.writeText(text).then(
+            () => status("Copied to the clipboard"),
+            () => status("The browser didn't allow copying to the clipboard")
+          );
+        },
+        { once: true, capture: true }
+      );
+    }
+    pendingCopy = text;
+    status("Click anywhere to copy what the terminal sent to the clipboard");
+  });
+}
 const compact = new Intl.NumberFormat("en", {
   notation: "compact",
   maximumSignificantDigits: 4,
@@ -108,10 +139,45 @@ export class SerialTerminal {
     private vm: Emulator,
     private port: 0 | 1,
     readonly element: HTMLElement,
-    private counter: InstructionCounter
+    private counter: InstructionCounter,
+    status: (text: string) => void
   ) {
     this.term.loadAddon(this.fit);
     this.term.open(element);
+    // OSC 52 copies to the clipboard: ESC ] 52 ; c ; BASE64 BEL. With "?"
+    // instead of the text it asks for the clipboard, and the answer is typed
+    // back in the same form. The image's wl-copy, xclip, xsel and pbcopy and
+    // their paste versions use it, and so can tmux and Neovim.
+    this.term.parser.registerOscHandler(52, (data) => {
+      const base64 = data.slice(data.indexOf(";") + 1);
+      if (base64 === "?") {
+        void this.pasteToGuest(status);
+        return true;
+      }
+      try {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        copyFromGuest(new TextDecoder().decode(bytes), status);
+      } catch {
+        // Not base64; ignored like any unknown sequence
+      }
+      return true;
+    });
+    // Ctrl+Shift+C and Ctrl+Shift+V copy and paste, as in VS Code's and
+    // Linux terminals, where Ctrl+C and Ctrl+V go to the program
+    this.term.attachCustomKeyEventHandler((event) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey)
+        return true;
+      if (event.code === "KeyC") {
+        // Also keeps Chrome from opening its element inspector
+        event.preventDefault();
+        if (event.type === "keydown" && this.term.hasSelection())
+          void navigator.clipboard.writeText(this.term.getSelection());
+        return false;
+      }
+      // Left to the browser, which pastes into xterm's textarea, so this
+      // needs no clipboard permission
+      return event.code !== "KeyV";
+    });
     this.term.onData((data) => {
       counter.activity();
       vm.serial_send_bytes(port, encoder.encode(data));
@@ -119,6 +185,42 @@ export class SerialTerminal {
     vm.add_listener(`serial${port}-output-byte`, (byte) => this.receive(byte));
     new ResizeObserver(() => !element.hidden && this.fit.fit()).observe(
       element
+    );
+  }
+
+  /**
+   * Answers a request for the clipboard. Any program in the VM could ask, so
+   * it is only answered while this terminal has focus, as it does right after
+   * typing a paste command. A refusal answers with nothing, so the command
+   * doesn't wait.
+   */
+  private async pasteToGuest(status: (text: string) => void) {
+    let text = "";
+    if (
+      !document.hasFocus() ||
+      !this.element.contains(document.activeElement)
+    ) {
+      status(
+        "Pasting from the clipboard only works while its terminal has focus"
+      );
+    } else {
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        status("The browser didn't allow reading the clipboard");
+      }
+    }
+    let bytes = encoder.encode(text);
+    // It's typed in through the emulated serial port, which is slow for more
+    if (bytes.length > MAX_PASTE_BYTES) {
+      status("The clipboard is too big to paste into the VM (over 1 MB)");
+      bytes = new Uint8Array();
+    }
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    this.vm.serial_send_bytes(
+      this.port,
+      encoder.encode(`\x1b]52;c;${btoa(binary)}\x07`)
     );
   }
 
