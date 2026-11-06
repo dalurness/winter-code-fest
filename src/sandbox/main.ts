@@ -29,6 +29,7 @@ const ui = {
   bench: $<HTMLButtonElement>("bench"),
   reset: $<HTMLButtonElement>("reset"),
   settingsButton: $<HTMLButtonElement>("settings-button"),
+  explorerToggle: $<HTMLButtonElement>("explorer-toggle"),
   settings: $<HTMLFormElement>("settings"),
   workbench: $("workbench"),
   main: $("main"),
@@ -561,6 +562,8 @@ function activate(path: string | undefined, { focus = true } = {}) {
   }
 
   active = path;
+  // Opening a file on a phone shows it instead of the explorer
+  if (narrow.matches) ui.workbench.classList.remove("sidebar-open");
   const file = fileAt(path);
   editor.setModel(file?.model ?? null);
   editor.updateOptions({ wordWrap: wordWrap() });
@@ -1113,6 +1116,12 @@ document.addEventListener("pointerdown", (event) => {
   const target = event.target as Element;
   if (!target.closest(".context-menu")) hideMenu();
   if (!target.closest(".quick-open")) hideQuickOpen();
+  // Tapping beside the explorer on a phone closes it
+  if (
+    narrow.matches &&
+    !target.closest(".sidebar, #explorer-toggle, .context-menu")
+  )
+    ui.workbench.classList.remove("sidebar-open");
 });
 
 // --- Explorer ------------------------------------------------------------
@@ -1731,9 +1740,19 @@ ui.quickOpenInput.onkeydown = (event) => {
 
 const root = document.documentElement.style;
 
-function showSidebar(show = ui.workbench.classList.contains("sidebar-hidden")) {
-  ui.workbench.classList.toggle("sidebar-hidden", !show);
+/** On a phone the explorer slides over the editor instead of sitting beside it */
+const narrow = matchMedia("(max-width: 700px)");
+
+function showSidebar(show?: boolean) {
+  if (narrow.matches) {
+    show ??= !ui.workbench.classList.contains("sidebar-open");
+    ui.workbench.classList.toggle("sidebar-open", show);
+  } else {
+    show ??= ui.workbench.classList.contains("sidebar-hidden");
+    ui.workbench.classList.toggle("sidebar-hidden", !show);
+  }
 }
+ui.explorerToggle.onclick = () => showSidebar();
 
 function showPanel(show = ui.main.classList.contains("panel-hidden")) {
   ui.main.classList.toggle("panel-hidden", !show);

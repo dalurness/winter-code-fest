@@ -136,6 +136,16 @@ button.icon.on {
   background: var(--hover-icon);
 }
 
+#explorer-toggle {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  #explorer-toggle {
+    display: inline-block;
+  }
+}
+
 button.icon svg {
   width: 18px;
   height: 18px;
@@ -208,6 +218,7 @@ button.icon svg {
 /* --- Workbench --- */
 
 .workbench {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
@@ -1080,9 +1091,34 @@ button.icon svg {
     display: none;
   }
 
+  .workbench.sidebar-open .sidebar {
+    display: flex;
+    position: absolute;
+    inset: 0 auto 0 0;
+    /* Under menus and quick open */
+    z-index: 15;
+    width: min(85vw, 320px);
+    box-shadow: 0 0 24px rgb(0 0 0 / 0.35);
+  }
+
   .titlebar .crumb,
-  .footer-info {
+  .titlebar strong,
+  .titlebar .label,
+  .statusbar .footer-info,
+  #cursor,
+  #indent {
     display: none;
+  }
+
+  /* A long message shrinks instead of widening the page */
+  #status {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .titlebar button {
+    white-space: nowrap;
   }
 
   /* Just the logo */
