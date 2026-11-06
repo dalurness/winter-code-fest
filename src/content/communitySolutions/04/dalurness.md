@@ -1,6 +1,107 @@
 ---
-descriptions: ["zig"]
+descriptions: ["zig", "go"]
 ---
+
+### 2026 Solution Go
+
+<details>
+<summary>Show Go Solution</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"bufio"
+	"log"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	for i := range 6 {
+		printPic(fmt.Sprintf("/workspace/days/04/%d.txt", i))
+		fmt.Printf("\n\n\n\n\n\n\n=============================\n\n\n\n\n\n")
+	}
+}
+
+func printPic(filename string) {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("Failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	x := 0
+	y := 0
+	largestx := 0
+	largesty := 0
+	var result = make(map[[2]int]string)
+
+	for scanner.Scan() {
+		instruction := scanner.Text()
+		instruction = strings.TrimSpace(instruction)
+
+		action := instruction[0]
+		value := instruction[1:]
+
+		switch action {
+			case 'L': {
+				if value == "R" {
+					x = 0
+					y = 0
+				} else {
+					x -= getNum(value)
+				}
+			}
+			case 'D':
+				y += getNum(value)
+				if y > largesty {
+					largesty = y
+				}
+			case 'U':
+				y -= getNum(value)
+			case 'R':
+				x += getNum(value)
+				if x > largestx {
+					largestx = x
+				}
+			case 'P':
+				result[[2]int{x,y}] = string(value)
+			default:
+				log.Fatalf("unexpected instruction: K: %s V: %s", string(action), string(value))
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("error while reading files: %s", err)
+	}
+
+	for y := 0; y <= largesty; y++ {
+		for x := 0; x <= largestx; x++ {
+			v, ok := result[[2]int{x,y}] 
+			if ok {
+				fmt.Print(v)
+				continue
+			}
+			fmt.Printf(" ")
+		}
+		fmt.Printf("\n")
+	}
+}
+
+func getNum(c string) int {
+	n, err := strconv.Atoi(string(c))
+	if err != nil {
+		log.Fatalf("expected string to be a number: %s", string(c))
+	}
+	return n
+}
+```
+
+</details>
 
 ### 2025 Solution Zig
 
