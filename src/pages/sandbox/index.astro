@@ -99,6 +99,14 @@ const SHORTCUTS = [
       >
         <span class="glyph">⏱</span><span class="label"> Benchmark</span>
       </button>
+      <button
+        id="submit"
+        hidden
+        disabled
+        title="Open a pull request on GitHub with the open file as your solution"
+      >
+        <span class="glyph">⇪</span><span class="label"> Submit</span>
+      </button>
       <span class="spacer"></span>
       <button id="reset" disabled title="Restore the VM snapshot">
         Reset VM
@@ -352,6 +360,32 @@ const SHORTCUTS = [
       <ul id="quick-open-results" role="listbox"></ul>
     </div>
     <ul id="context-menu" class="context-menu" role="menu" hidden></ul>
+    <dialog id="submit-dialog" class="submit-dialog">
+      <form method="dialog">
+        <h2>Submit your solution</h2>
+        <p>
+          Sends <code id="submit-file"></code> to GitHub as your day
+          <span id="submit-day"></span> solution. GitHub forks the repo for you
+          if you haven't yet; commit the file there, then open the pull
+          request.
+        </p>
+        <label>
+          GitHub username
+          <input
+            id="submit-username"
+            name="username"
+            required
+            autocomplete="username"
+            spellcheck="false"
+            pattern="[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}"
+          />
+        </label>
+        <div class="buttons">
+          <button value="cancel" formnovalidate>Cancel</button>
+          <button id="submit-go" class="primary" value="go">Open GitHub</button>
+        </div>
+      </form>
+    </dialog>
 
     <script>
       import "../../sandbox/main.ts";
