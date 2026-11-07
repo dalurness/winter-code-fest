@@ -1,8 +1,125 @@
 ---
-descriptions: ["ruby"]
+descriptions: ["ruby", "go"]
 ---
 
+## 2026
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+)
+
+func render(filePath string) (out string, err error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	x, y := 0, 0
+	canvas := make([][]rune, 0)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if len(line) < 2 {
+			err = fmt.Errorf("Invalid command: %q", line)
+			return
+		}
+
+		command := line[0]
+		value := line[1:]
+
+		if command == 'L' && value == "R" {
+			x, y = 0, 0
+			continue
+		}
+
+		if command == 'P' {
+			r, size := utf8.DecodeRuneInString(value)
+			if size != len(value) {
+				err = fmt.Errorf("Invalid print command: %q", line)
+				return
+			}
+
+			if y >= len(canvas) {
+				for range y - len(canvas) + 1 {
+					canvas = append(canvas, make([]rune, 0))
+				}
+			}
+			row := canvas[y]
+
+			if x >= len(row) {
+				for range x - len(row) + 1 {
+					row = append(row, ' ')
+				}
+				canvas[y] = row
+			}
+
+			row[x] = r
+			continue
+		}
+
+		amount, atoiErr := strconv.Atoi(value)
+		if atoiErr != nil {
+			err = fmt.Errorf("Invalid command: %q", line)
+			return
+		}
+
+		switch command {
+		case 'U':
+			y -= amount
+		case 'D':
+			y += amount
+		case 'L':
+			x -= amount
+		case 'R':
+			x += amount
+		default:
+			err = fmt.Errorf("Invalid command: %q", line)
+			return
+		}
+	}
+
+	if err = scanner.Err(); err != nil {
+		return
+	}
+
+	var outBuilder strings.Builder
+	for _, row := range canvas {
+		outBuilder.WriteString(string(row))
+		outBuilder.WriteByte('\n')
+	}
+
+	return outBuilder.String(), nil
+}
+
+func main() {
+	fileNames := []string{"0.txt", "1.txt", "2.txt", "3.txt", "4.txt", "5.txt"}
+	for _, name := range fileNames {
+		fmt.Printf("%s:\n", name)
+		picture, err := render("/workspace/days/04/" + name)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fmt.Println(picture)
+	}
+}
+```
+
 ## 2025
+
+<details>
+<summary>Show Ruby Solution</summary>
 
 ```ruby
 require 'optparse'
@@ -64,3 +181,5 @@ if __FILE__ == $PROGRAM_NAME
 end
 
 ```
+
+</details>
