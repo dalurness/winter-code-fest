@@ -81,7 +81,7 @@ func printPic(filename string) {
 
 	for y := 0; y <= largesty; y++ {
 		for x := 0; x <= largestx; x++ {
-			v, ok := result[[2]int{x,y}] 
+			v, ok := result[[2]int{x,y}]
 			if ok {
 				fmt.Print(v)
 				continue
