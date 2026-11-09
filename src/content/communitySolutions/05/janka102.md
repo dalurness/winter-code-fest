@@ -4,6 +4,8 @@ descriptions: ["ruby", "go"]
 
 ## 2026
 
+### Recursive
+
 ```go
 package main
 
@@ -100,6 +102,155 @@ func main() {
 	}
 
 	fmt.Printf("Took %s\n", duration)
+}
+```
+
+### Iterative
+
+```go
+package main
+
+import (
+	"fmt"
+	"math/big"
+	"strings"
+)
+
+type Sleigh struct {
+	maxPresent int
+	size       int
+	presents   []int
+	memo       map[[2]int]*big.Int
+}
+
+func NewSleigh(size int) Sleigh {
+	return Sleigh{
+		maxPresent: 9,
+		size:       size,
+		presents:   make([]int, 0),
+		memo:       make(map[[2]int]*big.Int),
+	}
+}
+
+func (s *Sleigh) String() string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("%d:", s.size))
+
+	// b.WriteRune('[')
+	// for _, p := range s.presents {
+	// 	for range p {
+	// 		b.WriteRune(rune('0' + p))
+	// 	}
+	// }
+	// b.WriteString(strings.Repeat(" ", s.size-s.Filled()))
+	// b.WriteRune(']')
+
+	b.WriteString(fmt.Sprintf(" %s", s.Count().String()))
+
+	return b.String()
+}
+
+func (s *Sleigh) Last() int {
+	if len(s.presents) > 0 {
+		return s.presents[len(s.presents)-1]
+	}
+
+	return 0
+}
+
+func (s *Sleigh) Filled() int {
+	var sum int
+	for _, item := range s.presents {
+		sum += item
+	}
+	return sum
+}
+
+func (s *Sleigh) Count() *big.Int {
+	return s.memo[[2]int{0, s.size}]
+}
+
+func (s *Sleigh) Inc() bool {
+	last := s.Last()
+	filled := s.Filled()
+	empty := s.size - filled
+
+	if count, ok := s.memo[[2]int{last, empty}]; ok {
+		s.bump(count)
+	} else {
+		insert := 1
+		if s.Last() == 1 {
+			insert = 2
+		}
+
+		if filled+insert <= s.size {
+			s.memo[[2]int{last, empty}] = big.NewInt(0)
+
+			s.presents = append(s.presents, insert)
+
+			if filled+insert == s.size {
+				s.bump(big.NewInt(1))
+			}
+			return true
+		}
+	}
+
+	return s.roll()
+}
+
+// / Bump counters
+func (s *Sleigh) bump(count *big.Int) {
+	size := s.size
+	s.memo[[2]int{0, size}] = s.memo[[2]int{0, size}].Add(s.memo[[2]int{0, size}], count)
+	for _, p := range s.presents[:len(s.presents)-1] {
+		size -= p
+		s.memo[[2]int{p, size}] = s.memo[[2]int{p, size}].Add(s.memo[[2]int{p, size}], count)
+	}
+}
+
+// / Increment the rightmost present size, carrying if needed
+func (s *Sleigh) roll() bool {
+	firstMax := s.maxPresent
+	if s.size < s.maxPresent {
+		firstMax = s.size
+	}
+
+	for i := len(s.presents) - 1; i >= 0; i-- {
+		if i == 0 && s.presents[0] == firstMax {
+			return false
+		}
+
+		filled := s.Filled()
+		inc := 1
+		if i > 0 && s.presents[i-1] == s.presents[i]+1 {
+			inc = 2
+		}
+		if s.presents[i]+inc <= s.maxPresent && filled+inc <= s.size {
+			s.presents[i] += inc
+			if filled+inc == s.size {
+				s.bump(big.NewInt(1))
+			}
+			break
+		}
+
+		s.presents = s.presents[:len(s.presents)-1]
+	}
+
+	return true
+}
+
+func main() {
+	for s := range 30 {
+		sleigh := NewSleigh(s + 1)
+		// fmt.Println(sleigh.String())
+
+		for sleigh.Inc() {
+			// fmt.Println(sleigh.String())
+		}
+
+		fmt.Println(sleigh.String())
+	}
 }
 ```
 
