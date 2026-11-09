@@ -1,6 +1,106 @@
 ---
-descriptions: ["zig"]
+descriptions: ["zig", "go"]
 ---
+
+## 2026
+
+<details>
+<summary>Show Go Solution</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+	"bufio"
+	"regexp"
+	"strings"
+	"encoding/json"
+)
+
+func main() {
+	for i := 0; i < 5; i++ {
+		pf := parseFile(fmt.Sprintf("/workspace/days/06/input%d.txt", i))
+
+		text := decodeText(pf)
+		fmt.Println(text)
+		fmt.Printf("\n\n\n=============================\n\n\n")
+	}
+}
+
+func decodeText(pf parsedFile) string {
+	text := pf.text
+	for i := len(pf.mappings)-1; i >= 0; i-- {
+		key := pf.mappings[i][0]
+		value := pf.mappings[i][1]
+		text = strings.ReplaceAll(text, key, value)
+	}
+
+	return text
+}
+
+type parsedFile struct {
+	mappings [][2]string
+	text string
+}
+
+var re = regexp.MustCompile(`^(?P<key>.) => "(?P<value>.*)"$`)
+
+func parseFile(filename string) parsedFile {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("Failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	lines := make([]string, 0)
+	textLines := ""
+	for scanner.Scan() {
+		line := scanner.Text()
+		// line = strings.TrimSpace(line)
+		lines = append(lines, line)
+	}
+
+	mappings :=  make([][2]string, 0)
+	// parse mappings
+	for _, line := range lines {
+		match := re.FindStringSubmatch(line)
+
+		if match == nil {
+			textLines += line + "\n"
+			continue
+		}
+
+		// get capture groups
+		captures := make(map[string]string)
+		for i, name := range re.SubexpNames() {
+			// i == 0 is just the whole thing
+			if i != 0 && name != "" {
+				captures[name] = match[i]
+			}
+		}
+		// clean values from escape characters
+		var cleanValue string
+		err := json.Unmarshal([]byte(`"`+captures["value"]+`"`), &cleanValue)
+		if err != nil {
+			log.Fatalf("failed to unmarshal %v: %v", captures["value"], err)
+		}
+
+		mappings = append(mappings, [2]string{captures["key"], cleanValue})
+	}
+
+	return parsedFile{
+		mappings,
+		textLines,
+	}
+}
+```
+
+</details>
 
 ## 2025
 
