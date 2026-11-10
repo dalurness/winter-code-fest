@@ -16,6 +16,7 @@ import (
 	"log"
 	"strings"
 	"strconv"
+	"slices"
 )
 
 type LocationValue string
@@ -42,6 +43,7 @@ func main() {
 	start, end, fullMap, maxx, maxy := parseFile("/workspace/days/07/map.txt")
 
 	fmt.Printf("dfs: %s\n", formatAnswer(dfs(start, end, fullMap, maxx, maxy)))
+	fmt.Printf("bfs (optimal): %s\n", formatAnswer(bfs(start, end, fullMap, maxx, maxy)))
 }
 
 func formatAnswer(answer string) string {
@@ -62,6 +64,55 @@ func formatAnswer(answer string) string {
 	finalString += l
 
 	return finalString
+}
+
+func bfs(start Location, end Location, fm FullMap, maxx int, maxy int) string {
+	vm := make(VisitedMap, len(fm))
+
+	type LocationPath struct {
+		loc Location
+		path string
+	}
+	queue := []LocationPath{LocationPath{start, ""}}
+
+	for len(queue) > 0 {
+		locPath := queue[0]
+		queue = slices.Delete(queue, 0, 1)
+
+		loc := locPath.loc
+		// already visited
+		if vm[loc] {
+			continue
+		}
+		vm[loc] = true
+		// found it
+		if fm[loc] == EndLocation {
+			return locPath.path
+		}
+		// mountain
+		if fm[loc] == XLocation {
+			continue
+		}
+
+		// check right, return final direction attempt
+		if loc.x + 1 < maxx {
+			queue = append(queue, LocationPath{Location{ loc.x + 1, loc.y}, locPath.path + Right})
+		}
+		// check up
+		if loc.y - 1 >= 0 {
+			queue = append(queue, LocationPath{Location{ loc.x, loc.y - 1}, locPath.path + Up})
+		}
+		// check down
+		if loc.y + 1 < maxy {
+			queue = append(queue, LocationPath{Location{ loc.x, loc.y + 1}, locPath.path + Down})
+		}
+		// check left
+		if loc.x - 1 >= 0 {
+			queue = append(queue, LocationPath{Location{ loc.x - 1, loc.y}, locPath.path + Left})
+		}
+	}
+
+	return ""
 }
 
 func dfsSearch(loc Location, vm *VisitedMap, fm *FullMap, maxx int, maxy int, path string) string {
