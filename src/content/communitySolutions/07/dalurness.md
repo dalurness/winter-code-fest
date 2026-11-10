@@ -1,6 +1,158 @@
 ---
-descriptions: ["zig"]
+descriptions: ["zig", "go"]
 ---
+
+## 2026
+
+<details>
+<summary>Show Go Solution</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+	"strings"
+	"strconv"
+)
+
+type LocationValue string
+
+var StartLocation LocationValue = "S"
+var EndLocation LocationValue = "E"
+var XLocation LocationValue = "X"
+var OLocation LocationValue = "O"
+
+var Up string = "N"
+var Down string = "S"
+var Left string = "W"
+var Right string = "E"
+
+type Location struct {
+	x int
+	y int
+}
+
+type FullMap map[Location]LocationValue
+type VisitedMap map[Location]bool
+
+func main() {
+	start, end, fullMap, maxx, maxy := parseFile("/workspace/days/07/map.txt")
+
+	fmt.Printf("dfs: %s\n", formatAnswer(dfs(start, end, fullMap, maxx, maxy)))
+}
+
+func formatAnswer(answer string) string {
+	l := string(answer[0])
+	count := 0
+	finalString := ""
+	for _, v := range answer {
+		if string(v) == l {
+			count += 1
+			continue
+		}
+		finalString += strconv.Itoa(count)
+		count = 1
+		finalString += l
+		l = string(v)
+	}
+	finalString += strconv.Itoa(count)
+	finalString += l
+
+	return finalString
+}
+
+func dfsSearch(loc Location, vm *VisitedMap, fm *FullMap, maxx int, maxy int, path string) string {
+	// already visited
+	if (*vm)[loc] {
+		return ""
+	}
+	(*vm)[loc] = true
+	// found it
+	if (*fm)[loc] == EndLocation {
+		return path
+	}
+	// mountain
+	if (*fm)[loc] == XLocation {
+		return ""
+	}
+
+	var up string
+	var down string
+	var right string
+	// check right, return final direction attempt
+	if loc.x + 1 < maxx {
+		right = dfsSearch(Location{ loc.x + 1, loc.y}, vm, fm, maxx, maxy, path + Right)
+		if right != "" {
+			return right
+		}
+	}
+	// check up
+	if loc.y - 1 >= 0 {
+		up = dfsSearch(Location{loc.x, loc.y - 1}, vm, fm, maxx, maxy, path + Up)
+		if up != "" {
+			return up
+		}
+	}
+	// check down
+	if loc.y + 1 < maxy {
+		down = dfsSearch(Location{loc.x, loc.y + 1}, vm, fm, maxx, maxy, path + Down)
+		if down != "" {
+			return down
+		}
+	}
+	// check left
+	if loc.x - 1 >= 0 {
+		return dfsSearch(Location{loc.x - 1, loc.y}, vm, fm, maxx, maxy, path + Left)
+	}
+
+	return ""
+}
+
+func dfs(start Location, end Location, fullMap FullMap, maxx int, maxy int) string {
+	vm := make(VisitedMap, len(fullMap))
+
+	return dfsSearch(start, &vm, &fullMap, maxx, maxy, "")
+}
+
+func parseFile(filename string) (start Location, end Location, fullMap FullMap, maxx int, maxy int) {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatalf("failed to open file %v\n", err)
+	}
+	
+	lines := strings.Split(string(content), "\n")
+
+	fullMap = make(FullMap)
+	for y, line := range lines {
+		for x, val := range line {
+			var locVal LocationValue
+			switch string(val) {
+				case "S":
+					maxx = len(line)
+					locVal = StartLocation
+					start = Location{x, y}
+				case "E":
+					locVal = EndLocation
+					end = Location{x, y}
+				case "X":
+					locVal = XLocation
+				case "O":
+					locVal = OLocation
+				default:
+					log.Fatalf("unknown character: %s\n", val)
+			}
+			fullMap[Location{x, y}] = locVal
+		}
+	}
+
+	return start, end, fullMap, maxx, len(lines)
+}
+```
+
+</details>
 
 ## 2025
 
