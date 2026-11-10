@@ -122,7 +122,7 @@ func parseFile(filename string) (start Location, end Location, fullMap FullMap, 
 	if err != nil {
 		log.Fatalf("failed to open file %v\n", err)
 	}
-	
+
 	lines := strings.Split(string(content), "\n")
 
 	fullMap = make(FullMap)
