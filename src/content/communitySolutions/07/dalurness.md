@@ -17,6 +17,8 @@ import (
 	"strings"
 	"strconv"
 	"slices"
+	"time"
+	"bytes"
 )
 
 type LocationValue string
@@ -37,13 +39,66 @@ type Location struct {
 }
 
 type FullMap map[Location]LocationValue
+
 type VisitedMap map[Location]bool
+var firstWrite bool = true
+var buf bytes.Buffer
+func (vm *VisitedMap) VisitLocation(loc Location, fm FullMap, maxx int, maxy int) {
+	(*vm)[loc] = true
+
+	// render frame
+	buf.Reset()
+	if firstWrite {
+		firstWrite = false
+		fmt.Print("\033[?25l")
+
+		s := "\033[2J\033[H"
+		for y := 0; y < maxy; y++ {
+			for x := 0; x < maxx; x++ {
+				loc := Location{x,y}
+				if (*vm)[loc] {
+					s += "*"
+				} else {
+					s += string(fm[loc])
+				}
+			}
+			s += "\n"
+		}
+		fmt.Fprint(&buf, s)
+	} else {
+
+		if fm[loc] == EndLocation {
+			for i := 0; i < 5; i++ {
+				fmt.Fprintf(&buf, "\033[%d;%dH%c", loc.y+1, loc.x+1, ' ')
+				os.Stdout.WriteString(buf.String())
+				time.Sleep(500 * time.Millisecond)
+
+				buf.Reset()
+				fmt.Fprintf(&buf, "\033[%d;%dH%c", loc.y+1, loc.x+1, EndLocation[0])
+				os.Stdout.WriteString(buf.String())
+				time.Sleep(500 * time.Millisecond)
+				buf.Reset()
+			}
+		}
+
+		fmt.Fprintf(&buf, "\033[%d;%dH%c", loc.y + 1, loc.x+1, '*')
+	}
+	os.Stdout.WriteString(buf.String())
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func (vm *VisitedMap) Cleanup() {
+	fmt.Printf("\033[2J\033[H\033[?25h")
+	firstWrite = true
+}
 
 func main() {
 	start, end, fullMap, maxx, maxy := parseFile("/workspace/days/07/map.txt")
 
-	fmt.Printf("dfs: %s\n", formatAnswer(dfs(start, end, fullMap, maxx, maxy)))
-	fmt.Printf("bfs (optimal): %s\n", formatAnswer(bfs(start, end, fullMap, maxx, maxy)))
+	answers := fmt.Sprintf("dfs: %s\n", formatAnswer(dfs(start, end, fullMap, maxx, maxy)))
+	answers += fmt.Sprintf("bfs (optimal): %s\n", formatAnswer(bfs(start, end, fullMap, maxx, maxy)))
+	fmt.Print(answers)
 }
 
 func formatAnswer(answer string) string {
@@ -68,6 +123,7 @@ func formatAnswer(answer string) string {
 
 func bfs(start Location, end Location, fm FullMap, maxx int, maxy int) string {
 	vm := make(VisitedMap, len(fm))
+	defer vm.Cleanup()
 
 	type LocationPath struct {
 		loc Location
@@ -84,7 +140,8 @@ func bfs(start Location, end Location, fm FullMap, maxx int, maxy int) string {
 		if vm[loc] {
 			continue
 		}
-		vm[loc] = true
+		// vm[loc] = true
+		vm.VisitLocation(loc, fm, maxx, maxy)
 		// found it
 		if fm[loc] == EndLocation {
 			return locPath.path
@@ -120,7 +177,7 @@ func dfsSearch(loc Location, vm *VisitedMap, fm *FullMap, maxx int, maxy int, pa
 	if (*vm)[loc] {
 		return ""
 	}
-	(*vm)[loc] = true
+	vm.VisitLocation(loc, *fm, maxx, maxy)
 	// found it
 	if (*fm)[loc] == EndLocation {
 		return path
@@ -164,6 +221,7 @@ func dfsSearch(loc Location, vm *VisitedMap, fm *FullMap, maxx int, maxy int, pa
 
 func dfs(start Location, end Location, fullMap FullMap, maxx int, maxy int) string {
 	vm := make(VisitedMap, len(fullMap))
+	defer vm.Cleanup()
 
 	return dfsSearch(start, &vm, &fullMap, maxx, maxy, "")
 }
