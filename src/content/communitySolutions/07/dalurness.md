@@ -1,6 +1,267 @@
 ---
-descriptions: ["zig"]
+descriptions: ["zig", "go"]
 ---
+
+## 2026
+
+<details>
+<summary>Show Go Solution</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+	"strings"
+	"strconv"
+	"slices"
+	"time"
+	"bytes"
+)
+
+type LocationValue string
+
+var StartLocation LocationValue = "S"
+var EndLocation LocationValue = "E"
+var XLocation LocationValue = "X"
+var OLocation LocationValue = "O"
+
+var Up string = "N"
+var Down string = "S"
+var Left string = "W"
+var Right string = "E"
+
+type Location struct {
+	x int
+	y int
+}
+
+type FullMap map[Location]LocationValue
+
+type VisitedMap map[Location]bool
+var firstWrite bool = true
+var buf bytes.Buffer
+func (vm *VisitedMap) VisitLocation(loc Location, fm FullMap, maxx int, maxy int) {
+	(*vm)[loc] = true
+
+	// render frame
+	buf.Reset()
+	if firstWrite {
+		firstWrite = false
+		fmt.Print("\033[?25l")
+
+		s := "\033[2J\033[H"
+		for y := 0; y < maxy; y++ {
+			for x := 0; x < maxx; x++ {
+				loc := Location{x,y}
+				if (*vm)[loc] {
+					s += "*"
+				} else {
+					s += string(fm[loc])
+				}
+			}
+			s += "\n"
+		}
+		fmt.Fprint(&buf, s)
+	} else {
+
+		if fm[loc] == EndLocation {
+			for i := 0; i < 5; i++ {
+				fmt.Fprintf(&buf, "\033[%d;%dH%c", loc.y+1, loc.x+1, ' ')
+				os.Stdout.WriteString(buf.String())
+				time.Sleep(500 * time.Millisecond)
+
+				buf.Reset()
+				fmt.Fprintf(&buf, "\033[%d;%dH%c", loc.y+1, loc.x+1, EndLocation[0])
+				os.Stdout.WriteString(buf.String())
+				time.Sleep(500 * time.Millisecond)
+				buf.Reset()
+			}
+		}
+
+		fmt.Fprintf(&buf, "\033[%d;%dH%c", loc.y + 1, loc.x+1, '*')
+	}
+	os.Stdout.WriteString(buf.String())
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func (vm *VisitedMap) Cleanup() {
+	fmt.Printf("\033[2J\033[H\033[?25h")
+	firstWrite = true
+}
+
+func main() {
+	start, end, fullMap, maxx, maxy := parseFile("/workspace/days/07/map.txt")
+
+	answers := fmt.Sprintf("dfs: %s\n", formatAnswer(dfs(start, end, fullMap, maxx, maxy)))
+	answers += fmt.Sprintf("bfs (optimal): %s\n", formatAnswer(bfs(start, end, fullMap, maxx, maxy)))
+	fmt.Print(answers)
+}
+
+func formatAnswer(answer string) string {
+	l := string(answer[0])
+	count := 0
+	finalString := ""
+	for _, v := range answer {
+		if string(v) == l {
+			count += 1
+			continue
+		}
+		finalString += strconv.Itoa(count)
+		count = 1
+		finalString += l
+		l = string(v)
+	}
+	finalString += strconv.Itoa(count)
+	finalString += l
+
+	return finalString
+}
+
+func bfs(start Location, end Location, fm FullMap, maxx int, maxy int) string {
+	vm := make(VisitedMap, len(fm))
+	defer vm.Cleanup()
+
+	type LocationPath struct {
+		loc Location
+		path string
+	}
+	queue := []LocationPath{LocationPath{start, ""}}
+
+	for len(queue) > 0 {
+		locPath := queue[0]
+		queue = slices.Delete(queue, 0, 1)
+
+		loc := locPath.loc
+		// already visited
+		if vm[loc] {
+			continue
+		}
+		// vm[loc] = true
+		vm.VisitLocation(loc, fm, maxx, maxy)
+		// found it
+		if fm[loc] == EndLocation {
+			return locPath.path
+		}
+		// mountain
+		if fm[loc] == XLocation {
+			continue
+		}
+
+		// check right, return final direction attempt
+		if loc.x + 1 < maxx {
+			queue = append(queue, LocationPath{Location{ loc.x + 1, loc.y}, locPath.path + Right})
+		}
+		// check up
+		if loc.y - 1 >= 0 {
+			queue = append(queue, LocationPath{Location{ loc.x, loc.y - 1}, locPath.path + Up})
+		}
+		// check down
+		if loc.y + 1 < maxy {
+			queue = append(queue, LocationPath{Location{ loc.x, loc.y + 1}, locPath.path + Down})
+		}
+		// check left
+		if loc.x - 1 >= 0 {
+			queue = append(queue, LocationPath{Location{ loc.x - 1, loc.y}, locPath.path + Left})
+		}
+	}
+
+	return ""
+}
+
+func dfsSearch(loc Location, vm *VisitedMap, fm *FullMap, maxx int, maxy int, path string) string {
+	// already visited
+	if (*vm)[loc] {
+		return ""
+	}
+	vm.VisitLocation(loc, *fm, maxx, maxy)
+	// found it
+	if (*fm)[loc] == EndLocation {
+		return path
+	}
+	// mountain
+	if (*fm)[loc] == XLocation {
+		return ""
+	}
+
+	var up string
+	var down string
+	var right string
+	// check right, return final direction attempt
+	if loc.x + 1 < maxx {
+		right = dfsSearch(Location{ loc.x + 1, loc.y}, vm, fm, maxx, maxy, path + Right)
+		if right != "" {
+			return right
+		}
+	}
+	// check up
+	if loc.y - 1 >= 0 {
+		up = dfsSearch(Location{loc.x, loc.y - 1}, vm, fm, maxx, maxy, path + Up)
+		if up != "" {
+			return up
+		}
+	}
+	// check down
+	if loc.y + 1 < maxy {
+		down = dfsSearch(Location{loc.x, loc.y + 1}, vm, fm, maxx, maxy, path + Down)
+		if down != "" {
+			return down
+		}
+	}
+	// check left
+	if loc.x - 1 >= 0 {
+		return dfsSearch(Location{loc.x - 1, loc.y}, vm, fm, maxx, maxy, path + Left)
+	}
+
+	return ""
+}
+
+func dfs(start Location, end Location, fullMap FullMap, maxx int, maxy int) string {
+	vm := make(VisitedMap, len(fullMap))
+	defer vm.Cleanup()
+
+	return dfsSearch(start, &vm, &fullMap, maxx, maxy, "")
+}
+
+func parseFile(filename string) (start Location, end Location, fullMap FullMap, maxx int, maxy int) {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatalf("failed to open file %v\n", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	fullMap = make(FullMap)
+	for y, line := range lines {
+		for x, val := range line {
+			var locVal LocationValue
+			switch string(val) {
+				case "S":
+					maxx = len(line)
+					locVal = StartLocation
+					start = Location{x, y}
+				case "E":
+					locVal = EndLocation
+					end = Location{x, y}
+				case "X":
+					locVal = XLocation
+				case "O":
+					locVal = OLocation
+				default:
+					log.Fatalf("unknown character: %s\n", val)
+			}
+			fullMap[Location{x, y}] = locVal
+		}
+	}
+
+	return start, end, fullMap, maxx, len(lines)
+}
+```
+
+</details>
 
 ## 2025
 
