@@ -52,10 +52,10 @@ func addCommon(fs *flag.FlagSet, c *common) {
 	fs.Int64Var(&c.y, "y", 0, "centre y (default: the start tile)")
 	fs.Int64Var(&c.zoom, "zoom", 1, "tiles per pixel (rounded down to a power of two)")
 	fs.BoolVar(&c.corr, "corridors", false, "highlight the corridor network")
-	fs.Func("palette", "colours: color, dark (grey air) or mono (black air, white mountains)", func(s string) error {
+	fs.Func("palette", "colours: color, dark (grey air), gray (dark air, light mountains) or mono (black and white)", func(s string) error {
 		p, ok := parsePalette(s)
 		if !ok {
-			return fmt.Errorf("want color, dark or mono")
+			return fmt.Errorf("want color, dark, gray or mono")
 		}
 		c.pal = p
 		return nil

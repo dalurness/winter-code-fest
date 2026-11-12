@@ -39,10 +39,11 @@ func heightColor(h int) rgb { return palette[h-mapgen.MinHeight] }
 const (
 	palColor = iota // full colour: teal and green air, brown to snow mountains
 	palDark         // dark grey air, coloured mountains
+	palGray         // dark grey air, light grey mountains, no middle greys
 	palMono         // black air, white mountains
 )
 
-var paletteNames = []string{"color", "dark", "mono"}
+var paletteNames = []string{"color", "dark", "gray", "mono"}
 
 func parsePalette(s string) (int, bool) {
 	for i, n := range paletteNames {
@@ -62,8 +63,25 @@ func tileColor(h, pal int) rgb {
 		return rgb{255, 255, 255}
 	case pal == palDark && h <= 0:
 		return darkAir[h-mapgen.MinHeight]
+	case pal == palGray && h <= 0:
+		// -8..0 -> 12..72: deeper is darker.
+		v := uint8(72 - 60*(-h)/8)
+		return rgb{v, v, v}
+	case pal == palGray:
+		// 1..8 -> 170..245: higher is lighter.
+		v := uint8(170 + 75*(h-1)/7)
+		return rgb{v, v, v}
 	}
 	return heightColor(h)
+}
+
+// oxText is the colour of an O/X character for a tile coloured c, drawn on
+// the terminal's own background. Very dark colours are lifted so the
+// character stays visible on a dark terminal.
+func oxText(c rgb) rgb {
+	const floor = 64
+	lift := func(v uint8) uint8 { return max(v, floor) }
+	return rgb{lift(c.r), lift(c.g), lift(c.b)}
 }
 
 // textOn picks black or white text for legibility on background c.

@@ -46,21 +46,20 @@ func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) 
 	return b.String()
 }
 
-// oxFrame renders one O (air) or X (mountain) per pixel, on a background
-// coloured by palette pal.
+// oxFrame renders one O (air) or X (mountain) per pixel on the terminal's
+// own background, each character coloured by palette pal.
 func oxFrame(v view, hs [][]int, marks map[[2]int]mark, pal int) string {
 	var b strings.Builder
 	for j, row := range hs {
 		for i, ht := range row {
-			ch, bg := oxChar(ht), tileColor(ht, pal)
+			ch, c := oxChar(ht), oxText(tileColor(ht, pal))
 			if m, ok := marks[[2]int{i, j}]; ok {
-				ch, bg = m.ch, m.c
+				ch, c = m.ch, m.c
 			}
 			if i == v.w/2 && j == v.h/2 {
-				ch = '+'
+				ch, c = '+', rgb{255, 220, 0}
 			}
-			fg := textOn(bg)
-			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%c", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b, ch)
+			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm%c", c.r, c.g, c.b, ch)
 		}
 		b.WriteString("\x1b[0m\r\n")
 	}

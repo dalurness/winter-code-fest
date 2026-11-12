@@ -51,25 +51,25 @@ Commands:
 | `day07-map serve`          | Answers chunk requests on stdin/stdout so any language can read the map; see below                                 |
 | `go test ./...`            | Determinism, golden checksum, far coordinates, terrain and corridor connectivity, the goal and the server protocol |
 
-Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-palette color|dark|mono` to pick the colours: `color` is the full palette, `dark` draws air in dark greys under coloured mountains, and `mono` is pure black air and white mountains. The viewer starts with that palette, and `png` and `dump -style color` use it too.
+Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-palette color|dark|gray|mono` to pick the colours: `color` is the full palette, `dark` draws air in dark greys under coloured mountains, `gray` uses dark greys for air and light greys for mountains with no middle greys, and `mono` is pure black air and white mountains. The viewer starts with that palette, and `png` and `dump -style color` use it too.
 
 ### Viewer keys
 
-| Key                                            | Action                                                                       |
-| ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| arrows, `w` `a` `s` `d`, `h` `j` `k` `l`       | Pan 4 pixels                                                                 |
-| Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                                            |
-| `f`                                            | Toggle fast pan, so the normal pan keys move half a screen                   |
-| `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                                   |
-| `m`                                            | Switch between colour half blocks and O/X characters                         |
-| `p`                                            | Cycle the palette: color, dark (grey air), mono (black air, white mountains) |
-| `o` / `0`                                      | Jump to the start                                                            |
-| `g`                                            | Jump to the goal                                                             |
-| `c`                                            | Highlight the corridor network                                               |
-| `?`                                            | Show or hide the help lines                                                  |
-| `q`                                            | Quit                                                                         |
+| Key                                            | Action                                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| arrows, `w` `a` `s` `d`, `h` `j` `k` `l`       | Pan 4 pixels                                                                                        |
+| Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                                                                   |
+| `f`                                            | Toggle fast pan, so the normal pan keys move half a screen                                          |
+| `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                                                          |
+| `m`                                            | Switch between colour half blocks and O/X characters                                                |
+| `p`                                            | Cycle the palette: color, dark (grey air), gray (dark air, light mountains), mono (black and white) |
+| `o` / `0`                                      | Jump to the start                                                                                   |
+| `g`                                            | Jump to the goal                                                                                    |
+| `c`                                            | Highlight the corridor network                                                                      |
+| `?`                                            | Show or hide the help lines                                                                         |
+| `q`                                            | Quit                                                                                                |
 
-The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` to switch to O/X characters, which keep the same palette as the tile backgrounds. The start is red, the goal is magenta and highlighted corridors are cyan.
+The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` to switch to O/X characters, drawn in the palette's colours on the terminal's own background. The start is red, the goal is magenta and highlighted corridors are cyan.
 
 When zoomed out, each pixel samples up to 4×4 tiles. A pixel counts as mountain when most samples are mountain, so the passable/impassable split stays honest at every zoom.
 
