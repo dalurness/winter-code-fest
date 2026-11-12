@@ -10,7 +10,7 @@ This folder is a standalone Go module. It is not part of the Astro site build. F
 - Heights run from **-8 to 8**. A height of **0 or less is passable air**; **1 or more is mountain**. The height only matters for drawing nicer maps.
 - **Movement is 4-directional** (north, east, south, west). Two air tiles that touch only at a corner are _not_ connected. There is no diagonal movement and no squeezing between mountains.
 - North is `-y`, the top of the screen, as in the original day 7.
-- **Every seed is solvable, with exactly one goal.** The start and the goal both lie on a corridor network that is connected by construction, and the goal is the corridor tile with the smallest SHA-256 digest in a ring around the start. See [DESIGN.md](./DESIGN.md#the-goal) for why the goal can't be worked out from the seed.
+- **Every seed is solvable.** The start and the goal are both nodes of a corridor network that is connected by construction, so a route always exists. `Goal(seed)` gives the goal straight away; for an extra-hard run, ignore it and find the goal by exploring with `IsGoal`. See [DESIGN.md](./DESIGN.md#the-goal).
 - The same seed always gives the same map. `TestGolden` pins a checksum, so an accidental change to the generator fails the tests.
 
 ```go
@@ -20,10 +20,8 @@ h := mapgen.Height(seed, x, y)     // -8..8
 ok := mapgen.Passable(seed, x, y)  // h <= 0
 sx, sy := mapgen.Start(seed)       // the corridor node of cell (0, 0)
 ok = mapgen.OnCorridor(seed, x, y) // part of the guaranteed-connected network
-ok = mapgen.InRing(seed, x, y)     // 2^18 <= distance from start < 2^19
-d, _ := mapgen.ParseDigest(hex)    // the published 64-character goal digest
-ok = mapgen.IsGoal(seed, d, x, y)  // true for exactly one tile
-g := mapgen.FindGoal(seed, nil)    // organisers: find the goal and its digest
+gx, gy := mapgen.Goal(seed)        // the goal: a corridor node 2^18-2^19 tiles away
+ok = mapgen.IsGoal(seed, x, y)     // for the extra-hard version: test tiles as you explore
 ```
 
 ## Running it
@@ -42,16 +40,16 @@ podman run --rm -it -v "$PWD/tools/day07-map":/src -w /src docker.io/library/gol
 
 Commands:
 
-| Command                    | What it does                                                                                                                                           |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `day07-map [view]`         | Interactive viewer (the default)                                                                                                                       |
-| `day07-map dump`           | Prints one frame to stdout. Use `-style shade`, `-style ox` (O/X like day 7) or `-style color`                                                         |
-| `day07-map png -o map.png` | Renders a frame to a PNG (`-w`, `-h`, `-scale`)                                                                                                        |
-| `day07-map scan`           | Finds the goal and prints its coordinates and the digest to publish. It hashes about 650 million corridor tiles: about 20 s on an idle 12-core machine |
-| `day07-map stats`          | Passable fraction, height histogram and time per `Height()` call                                                                                       |
-| `go test ./...`            | Determinism, golden checksum, far coordinates, terrain connectivity, corridor connectivity, corridor enumeration and goal uniqueness                   |
+| Command                    | What it does                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `day07-map [view]`         | Interactive viewer (the default)                                                                                                     |
+| `day07-map dump`           | Prints one frame to stdout. Use `-style shade`, `-style ox` (O/X like day 7) or `-style color`                                       |
+| `day07-map png -o map.png` | Renders a frame to a PNG (`-w`, `-h`, `-scale`)                                                                                      |
+| `day07-map goal`           | Prints the start and goal tiles                                                                                                      |
+| `day07-map stats`          | Passable fraction, height histogram and time per `Height()` call                                                                     |
+| `go test ./...`            | Determinism, golden checksum, far coordinates, terrain connectivity, corridor connectivity, corridor enumeration and goal uniqueness |
 
-Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-goal X,Y` (or `-goal find`, which runs the full search first) to mark the goal.
+Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network.
 
 ### Viewer keys
 
@@ -63,12 +61,12 @@ Every map command takes `-seed` (a number or any string; strings are hashed), `-
 | `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                    |
 | `m`                                            | Cycle the drawing mode: colour half blocks, ASCII shades, O/X |
 | `o` / `0`                                      | Jump to the start                                             |
-| `g`                                            | Jump to the goal, once the background search has found it     |
+| `g`                                            | Jump to the goal                                              |
 | `c`                                            | Highlight the corridor network                                |
 | `?`                                            | Show or hide the help lines                                   |
 | `q`                                            | Quit                                                          |
 
-The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal search progress (or the goal once found) and the frame time. The viewer searches for the goal in the background as soon as it starts, using every CPU. Pass `-goal X,Y` to skip that. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` for plain ASCII. The start is red, the two edges of the goal ring are yellow, the goal tile is magenta and highlighted corridors are cyan.
+The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` for plain ASCII. The start is red, the goal is magenta and highlighted corridors are cyan.
 
 When zoomed out, each pixel samples up to 4×4 tiles. A pixel counts as mountain when most samples are mountain, so the passable/impassable split stays honest at every zoom.
 
@@ -114,10 +112,10 @@ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOO
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOOOOXXXXXXXXXXXXXXXXO
 ```
 
-The whole goal ring at zoom 1:4096: the start (red), the ring between 262,144 and 524,288 tiles out (yellow), and the goal (magenta). At this zoom the terrain is just noise:
+The start (red, centre) and the goal (magenta, right) at zoom 1:2048. At this zoom the terrain is just noise:
 
-![Goal ring at zoom 1:4096](docs/ring-z4096.png)
+![Start and goal at zoom 1:2048](docs/start-goal-z2048.png)
 
-`scan` finds the goal for `north-pole` at (-117825, -254570), 284,476 tiles from the start, with digest `0000000d977a6440d8d0288e30f21e9bd6c2799dc7b8030f2a68322d0837babb`. Here it is at zoom 1:8 with corridors highlighted. It lies on a north–south corridor through open lowland:
+The goal for `north-pole` is at (322493, -86438), 330,002 tiles from the start. Here it is at zoom 1:8 with corridors highlighted: a four-way corridor junction in the middle of a massif's canyon maze.
 
 ![Goal area at zoom 1:8](docs/goal-z8.png)

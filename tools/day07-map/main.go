@@ -4,7 +4,7 @@
 //	day07-map [view] [flags]   interactive terminal viewer (default)
 //	day07-map dump [flags]     print one frame to stdout and exit
 //	day07-map png -o FILE      render a frame to a PNG image
-//	day07-map scan [flags]     find the goal tile and its digest (about a minute)
+//	day07-map goal [flags]     print the start and goal tiles
 //	day07-map stats [flags]    passable fraction and Height() speed
 package main
 
@@ -40,7 +40,6 @@ type common struct {
 	x, y    int64
 	zoom    int64
 	set     map[string]bool
-	goal    string
 	corr    bool
 }
 
@@ -49,7 +48,6 @@ func addCommon(fs *flag.FlagSet, c *common) {
 	fs.Int64Var(&c.x, "x", 0, "centre x (default: the start tile)")
 	fs.Int64Var(&c.y, "y", 0, "centre y (default: the start tile)")
 	fs.Int64Var(&c.zoom, "zoom", 1, "tiles per pixel (rounded down to a power of two)")
-	fs.StringVar(&c.goal, "goal", "", `mark the goal: "X,Y" if you know it, or "find" to search for it (about a minute)`)
 	fs.BoolVar(&c.corr, "corridors", false, "highlight the corridor network")
 }
 
@@ -57,32 +55,7 @@ func addCommon(fs *flag.FlagSet, c *common) {
 func (c *common) overlay() overlay {
 	ov := newOverlay(c.seed)
 	ov.corridors = c.corr
-	switch {
-	case c.goal == "find":
-		g := findGoalWithProgress(c.seed)
-		ov.goal = &g
-	case c.goal != "":
-		var g mapgen.Goal
-		if _, err := fmt.Sscanf(c.goal, "%d,%d", &g.X, &g.Y); err != nil {
-			fmt.Fprintln(os.Stderr, `-goal wants "X,Y" or "find"`)
-			os.Exit(2)
-		}
-		ov.goal = &g
-	}
 	return ov
-}
-
-// findGoalWithProgress runs FindGoal, printing progress to stderr.
-func findGoalWithProgress(seed uint64) mapgen.Goal {
-	var last time.Time
-	g := mapgen.FindGoal(seed, func(done, total int) {
-		if time.Since(last) > 500*time.Millisecond || done == total {
-			last = time.Now()
-			fmt.Fprintf(os.Stderr, "\rfinding goal: %d/%d cells", done, total)
-		}
-	})
-	fmt.Fprintln(os.Stderr)
-	return g
 }
 
 func (c *common) finish(fs *flag.FlagSet) {
@@ -115,12 +88,12 @@ func main() {
 		runDump(args)
 	case "png":
 		runPNG(args)
-	case "scan":
-		runScan(args)
+	case "goal":
+		runGoal(args)
 	case "stats":
 		runStats(args)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q (want view, dump, png, scan or stats)\n", cmd)
+		fmt.Fprintf(os.Stderr, "unknown command %q (want view, dump, png, goal or stats)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -231,21 +204,16 @@ func runPNG(args []string) {
 	fmt.Printf("wrote %s: seed=%s centre=(%d,%d) zoom=1:%d\n", *o, c.seedStr, c.x, c.y, c.zoom)
 }
 
-func runScan(args []string) {
-	fs := flag.NewFlagSet("scan", flag.ExitOnError)
+func runGoal(args []string) {
+	fs := flag.NewFlagSet("goal", flag.ExitOnError)
 	seedStr := fs.String("seed", "north-pole", "map seed")
 	fs.Parse(args)
 	seed := parseSeed(*seedStr)
 	sx, sy := mapgen.Start(seed)
-	t := time.Now()
-	g := findGoalWithProgress(seed)
-	fmt.Printf("seed:        %s (%d)\n", *seedStr, seed)
-	fmt.Printf("start:       (%d,%d)\n", sx, sy)
-	fmt.Printf("goal ring:   %d <= distance from start < %d\n", mapgen.RingMin, mapgen.RingMax)
-	fmt.Printf("hashed:      %d corridor tiles in %v\n", g.Hashed, time.Since(t).Round(time.Second))
-	fmt.Printf("goal:        (%d,%d), %.0f tiles from the start\n", g.X, g.Y, math.Hypot(float64(g.X-sx), float64(g.Y-sy)))
-	fmt.Printf("goal digest: %s\n", g.Digest)
-	fmt.Printf("check:       IsGoal=%v Height=%d\n", mapgen.IsGoal(seed, g.Digest, g.X, g.Y), mapgen.Height(seed, g.X, g.Y))
+	gx, gy := mapgen.Goal(seed)
+	fmt.Printf("seed:  %s (%d)\n", *seedStr, seed)
+	fmt.Printf("start: (%d,%d)\n", sx, sy)
+	fmt.Printf("goal:  (%d,%d), %.0f tiles from the start\n", gx, gy, math.Hypot(float64(gx-sx), float64(gy-sy)))
 }
 
 func runStats(args []string) {

@@ -1,6 +1,6 @@
 # Day 7 advanced map: design notes
 
-This covers how the terrain is generated, how the corridor network makes every seed solvable, how the goal is chosen so it is unique but can't be worked out from the seed, how a solver would find the goal and then a route, and how hierarchical pathfinding handles a map this size. The code is in [`mapgen/`](./mapgen); how to run it is in the [README](./README.md).
+This covers how the terrain is generated, how the corridor network makes every seed solvable, how the goal is chosen, how a solver would find the goal and then a route, and how hierarchical pathfinding handles a map this size. The code is in [`mapgen/`](./mapgen); how to run it is in the [README](./README.md).
 
 ## Terrain
 
@@ -35,7 +35,7 @@ The guarantees come from the shape. `mapgen/corridor.go` has the details and `co
 - The wiggle is a sum of two sine waves times `sin(πt)`, so it is zero at both nodes. Its amplitude is scaled from the frequencies so the slope is at most 0.9, which keeps the band at least 2·2/√(1+0.81) ≈ 3 tiles thick at any angle. That's enough to stay 4-connected (`TestCorridorConnected` floods 3×3 blocks of cells using corridor tiles only and reaches every node, including at coordinates near 2^43).
 - The wiggle is at most about 0.11 cells, and nodes sit in the middle half of their cell, so a corridor never leaves the two cells it joins. `OnCorridor(seed, x, y)` therefore only has to check the node disc and four corridors of the tile's own cell, which keeps it a cheap, pure function.
 - Corridors are carved after the ranges and stamps, by capping elevation at -0.2 (height -2). Nothing can block them (`TestCorridorPassable`).
-- `Start(seed)` is the node of cell (0, 0), so the start is always on the network.
+- `Start(seed)` is the node of cell (0, 0) and `Goal(seed)` is another node, so both are always on the network.
 
 Without the highlight, corridors look like any other narrow canyon. At low zoom with `-corridors` on, their grid layout is plain to see. The corridor code is public, so solvers can find them too; see below for why that's fine.
 
@@ -43,55 +43,50 @@ Without the highlight, corridors look like any other narrow canyon. At low zoom 
 
 ### What the code does
 
-- **Candidates** are corridor tiles whose distance from the start is in [2^18, 2^19), between 262,144 and 524,288 tiles. For `north-pole` there are about 646 million of them.
-- Every candidate gets a **SHA-256 digest** of `"wcfday07" ‖ seed ‖ x ‖ y`. The **goal is the candidate with the smallest digest.**
-- Solvers get the seed and the goal digest, a 64-character hex string. `IsGoal(seed, digest, x, y)` is true when the tile is a candidate and its digest equals the published one.
-- `FindGoal` (and the `scan` command) walks every corridor tile in the ring, hashes it and keeps the smallest. Organisers run it once per seed to get the digest to publish. It takes about 20 s on an idle 12-core machine, or about 4 CPU-minutes.
+- `Goal(seed)` picks a point at a seed-chosen angle and a seed-chosen distance between 2^18 and 2^19 tiles (262,144 to 524,288) from the start, then returns the corridor node of the cell containing that point. The goal can therefore land up to about one cell outside that range.
+- The goal is a corridor node and so is the start. The network is connected, so **every seed has exactly one goal and a route to it always exists**, without organisers having to check anything (`TestGoal`, `TestCorridorConnected`).
+- `IsGoal(seed, x, y)` tests one tile, and the `goal` command prints the start and goal.
 
-For `north-pole` the goal is at (-117825, -254570), 284,476 tiles from the start, with digest `0000000d977a6440d8d0288e30f21e9bd6c2799dc7b8030f2a68322d0837babb`.
+For `north-pole` the start is (4620, 2206) and the goal is (322493, -86438), 330,002 tiles away.
 
-### Why every seed has exactly one goal, and it is reachable
+### Known goal, or an extra-hard version
 
-- **Exactly one.** The minimum of a set of distinct SHA-256 digests is unique. Two candidates would need the same digest, which is a SHA-256 collision; nobody has ever found one. So every seed has exactly one goal tile and `IsGoal` is true for exactly one tile (`TestGoalUnique`).
-- **Reachable.** The goal is a corridor tile and the start is a corridor node. The network is connected, so a route always exists, and every seed works without organisers having to check it.
+The goal comes straight from the seed, so anyone can get it immediately. That's deliberate:
 
-### Why the goal can't be worked out from the seed
+- **Normal:** the challenge publishes the seed, the start and the goal, or solvers call `Goal(seed)`. The hard part is the route.
+- **Extra hard:** solvers ignore `Goal` and find the goal by exploring outward from the start, asking `IsGoal` about each tile they visit. This is on the honour system: `IsGoal` is just a comparison with `Goal`, so nothing stops anyone from reading it.
 
-- **No shortcut through the hash.** Knowing the digest doesn't tell you the tile, because SHA-256 can't be run backwards. The only way to find the goal is to hash candidates until one matches. That means visiting the corridor network across the whole ring: about 650 million tiles, done chunk by chunk or edge by edge.
-- **The hash has to be cryptographic.** The fast mixer the terrain uses is invertible. With it, a solver could pick any `x`, solve for the matching `y` and skip almost all the work. SHA-256 rules that out.
-- **Nothing points the way.** The seed decides the node positions and corridor shapes, but nothing about it hints at which corridor in which part of the ring holds the smallest digest.
-- **What this can't do.** Any goal a solver can test locally can be found by testing every candidate. This design makes that test the only shortcut and makes it cost real work. It still isn't a secret: a determined solver will find the goal in tens of seconds of CPU time. Truly hiding it would need a server holding a secret key, so solvers query `isGoal(x, y)` over the network. That can't be checked offline and rate limits fight honest exploration, so it isn't worth it here.
+A goal that truly can't be worked out from the seed is possible. An earlier version of this branch did it: the goal was the corridor tile with the smallest SHA-256 digest in a ring, solvers got only the digest, and finding the goal took hashing about 650 million tiles. It was dropped for simplicity. Even then, the search was a brute-force scan, not pathfinding, and a fully secret goal would need a server holding a key.
 
 ### What the corridors give away, and the answer to check
 
 The corridor code is public, so a solver can follow the network from the start to the goal without looking at the terrain at all. That's a **valid but long** route. Corridors run along the coarse grid and meander, so the shortest route cuts across canyons and passes instead. A solver who only follows corridors gets a valid answer that is far from the shortest.
 
-"Exactly one valid solution" fits the goal, not the route: open terrain always allows many routes. Some options for what to check:
+Open terrain always allows many routes, so the route itself can't be the unique answer. Some options for what to check:
 
-- **Goal coordinates.** Unique, and works with the site's existing hash-based answer checker. This tests pass 1.
 - **A route, checked by a verifier.** Walk the submitted moves from the start with `Height`, and confirm every step is air and the walk ends on the goal. A route of a few hundred thousand steps checks in well under a second. Report the length, so shorter routes rank higher.
-- **The shortest route length.** Also unique, but organisers would need an exact solver at a scale of hundreds of thousands of tiles. That's a big job, so treat it as a stretch goal.
+- **The shortest route length.** Unique, but organisers would need an exact solver at a scale of hundreds of thousands of tiles. That's a big job, so treat it as a stretch goal.
 
-**Recommendation:** publish the seed, the goal digest and the ring. Ask for the goal coordinates plus a route, checked by a verifier. Rank routes by length.
+**Recommendation:** ask for a route, check it with a verifier, and rank routes by length.
 
 ### Two passes for a solver
 
-1. **Find the goal.** Enumerate the corridor tiles in the ring, either straight from the corridor formula or by exploring chunk by chunk, and hash each one until `IsGoal` is true. This touches about 650 million tiles but needs no terrain and almost no memory.
-2. **Find a route.** Run the hierarchical search below between the start and the now-known goal. The corridors give a guaranteed fallback route and an upper bound on the length, which helps prune the search.
+1. **Find the goal.** Normally that's just `Goal(seed)`. In the extra-hard version, explore outward chunk by chunk from the start and test the tiles you generate with `IsGoal`. The chunk-level search below works for this, and the chunk summaries it builds carry over to pass 2.
+2. **Find a route.** Run the hierarchical search below between the start and the goal. The corridors give a guaranteed fallback route and an upper bound on the length, which helps prune the search.
 
 ## Why naive search fails, and what to do instead
 
 ### Memory needed by flat search
 
-The goal for `north-pole` is about 284,000 tiles away. A BFS or DFS from the start explores roughly a disc of that radius before it reaches the goal: π × (2.84 × 10^5)² × 0.44 ≈ **1.1 × 10^11 air tiles**. The memory needed:
+The goal for `north-pole` is about 330,000 tiles away. A BFS or DFS from the start explores roughly a disc of that radius before it reaches the goal: π × (3.3 × 10^5)² × 0.44 ≈ **1.5 × 10^11 air tiles**. The memory needed:
 
 | Representation                                                         | Memory                                                                    |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Hash set of visited tiles (≥16 bytes per tile, before parent pointers) | **≥ 1.8 TB**                                                              |
-| Dense visited bitmap over the 569k × 569k bounding square              | 3.2 × 10^11 bits ≈ **40 GB**                                              |
-| A\* with Manhattan heuristic                                           | Depends on the maze. Even 1% of the BFS disc is about 18 GB in a hash map |
+| Hash set of visited tiles (≥16 bytes per tile, before parent pointers) | **≥ 2.4 TB**                                                              |
+| Dense visited bitmap over the 660k × 660k bounding square              | 4.4 × 10^11 bits ≈ **54 GB**                                              |
+| A\* with Manhattan heuristic                                           | Depends on the maze. Even 1% of the BFS disc is about 24 GB in a hash map |
 
-A goal at the outer edge of the ring is 524,288 tiles out, which makes every number about 3.4× bigger: a 6 TB hash set or a 137 GB bitmap. So flat search is past 4 GB in every form, and a plain hash-map BFS is past 1 TB. A determined solver with a bit-packed visited set could fit a flat BFS on a large disk, but not in RAM. Doubling `RingMin` and `RingMax` makes every number 4× bigger.
+A goal at the far end of the range is about 524,000 tiles out, which makes every number about 2.5× bigger: a 6 TB hash set or a 137 GB bitmap. So flat search is past 4 GB in every form, and a plain hash-map BFS is past 1 TB. A determined solver with a bit-packed visited set could fit a flat BFS on a large disk, but not in RAM. Doubling `GoalMinDistance` and `GoalMaxDistance` makes every number 4× bigger.
 
 ### Hierarchical pathfinding (HPA\*-style)
 
@@ -108,7 +103,7 @@ A goal at the outer edge of the ring is 524,288 tiles out, which makes every num
 
 ### Memory bounds and storing explored chunks on disk
 
-- **In RAM:** the A\* open and closed sets over portals, plus an LRU cache of chunk bitmaps (8 KB each). A band of chunks about 1,100 long (284,000 / 256) by about 200 wide is about 220k chunk summaries. At about 0.5 KB each that's around 110 MB, and the summaries can be evicted too.
-- **On disk:** store summaries keyed by `(seed, cx, cy)` in a simple append-only file or a key-value store such as bbolt or SQLite. Because chunks are pure functions of the seed, any summary can be thrown away and recomputed, so the cache is just an optimisation, never a source of truth. Pass 2 reruns and threads share it.
-- **Time:** about 37 ms to generate a chunk on one core. 220k chunks take about 2.3 core-hours, or about 12 minutes on 12 cores. Chunks are independent, so this parallelises perfectly. A goal at the outer edge of the ring roughly doubles that. That cost is why the ring is 2^18–2^19 and not further out.
+- **In RAM:** the A\* open and closed sets over portals, plus an LRU cache of chunk bitmaps (8 KB each). A band of chunks about 1,300 long (330,000 / 256) by about 200 wide is about 260k chunk summaries. At about 0.5 KB each that's around 130 MB, and the summaries can be evicted too.
+- **On disk:** store summaries keyed by `(seed, cx, cy)` in a simple append-only file or a key-value store such as bbolt or SQLite. Because chunks are pure functions of the seed, any summary can be thrown away and recomputed, so the cache is just an optimisation, never a source of truth. Both passes, reruns and threads share it.
+- **Time:** about 37 ms to generate a chunk on one core. 260k chunks take about 2.7 core-hours, or about 13 minutes on 12 cores. Chunks are independent, so this parallelises perfectly. A goal at the far end of the range roughly doubles that. That cost is why the goal is 2^18–2^19 tiles away and not further.
 - **Faster chunks** (optional, for the solver): a chunk generator can evaluate the low-frequency layers once per lattice cell instead of once per tile. `Height` itself stays the reference, and the results must match it bit for bit.

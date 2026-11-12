@@ -5,9 +5,8 @@
 // arguments, never on neighbouring tiles or on anything computed earlier, so
 // any tile anywhere in the int64 plane can be queried directly.
 //
-// Every seed is solvable: the start and the goal both lie on a corridor
-// network that is connected by construction (see corridor.go), and there is
-// exactly one goal tile (see goal.go).
+// Every seed is solvable: the start and the goal are both nodes of a
+// corridor network that is connected by construction (see corridor.go).
 //
 // Heights run from -8 to 8. A height of 0 or less is passable air; 1 or more is
 // mountain. Movement is 4-directional (N, E, S, W): two passable tiles that

@@ -1,6 +1,9 @@
 package mapgen
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // Every node of a 3x3 block of cells must be reachable from the others by
 // stepping 4-directionally on corridor tiles alone. This checks the shape
@@ -43,84 +46,43 @@ func TestCorridorConnected(t *testing.T) {
 	}
 }
 
-// eachEdgeTile must report exactly the tiles contains accepts: brute force
-// over the edge's bounding box and compare.
-func TestEdgeEnumerationComplete(t *testing.T) {
-	for _, c := range []struct {
-		seed uint64
-		i, j int64
-		h    bool
-	}{{1, 0, 0, true}, {1, 0, 0, false}, {7, -3, 2, true}, {9, 4, -1, false}} {
-		e := newEdge(c.seed, c.i, c.j, c.h)
-		got := map[[2]int64]int{}
-		eachEdgeTile(e, func(x, y int64) { got[[2]int64{x, y}]++ })
-		bx, by := e.ax+int64(e.dx*e.length), e.ay+int64(e.dy*e.length)
-		pad := int64(e.reach) + 3
-		want := 0
-		for y := min(e.ay, by) - pad; y <= max(e.ay, by)+pad; y++ {
-			for x := min(e.ax, bx) - pad; x <= max(e.ax, bx)+pad; x++ {
-				if !e.contains(x, y) {
-					continue
-				}
-				want++
-				if got[[2]int64{x, y}] != 1 {
-					t.Fatalf("seed %d edge (%d,%d,%v): tile (%d,%d) reported %d times", c.seed, c.i, c.j, c.h, x, y, got[[2]int64{x, y}])
+// Corridor tiles are always passable, whatever terrain was underneath.
+func TestCorridorPassable(t *testing.T) {
+	const seed = 5
+	n := 0
+	for y := int64(0); y < 2*CorridorCell; y += 3 {
+		for x := int64(0); x < 2*CorridorCell; x += 3 {
+			if OnCorridor(seed, x, y) {
+				n++
+				if !Passable(seed, x, y) {
+					t.Fatalf("corridor tile (%d,%d) is not passable", x, y)
 				}
 			}
 		}
-		if len(got) != want {
-			t.Fatalf("seed %d edge (%d,%d,%v): enumerated %d tiles, brute force found %d", c.seed, c.i, c.j, c.h, len(got), want)
-		}
+	}
+	if n < 1000 {
+		t.Fatalf("only %d corridor tiles sampled", n)
 	}
 }
 
-// Corridor tiles are always passable, whatever terrain was underneath.
-func TestCorridorPassable(t *testing.T) {
-	n := 0
-	eachCorridorTile(5, 2, 3, func(x, y int64) {
-		if n%7 == 0 && !Passable(5, x, y) {
-			t.Fatalf("corridor tile (%d,%d) is not passable", x, y)
+// The goal is a passable corridor node at roughly the promised distance, the
+// only tile IsGoal accepts, and the same on every call.
+func TestGoal(t *testing.T) {
+	for seed := uint64(0); seed < 50; seed++ {
+		gx, gy := Goal(seed)
+		if hx, hy := Goal(seed); hx != gx || hy != gy {
+			t.Fatalf("seed %d: goal changed between calls", seed)
 		}
-		if n%997 == 0 && !OnCorridor(5, x, y) {
-			t.Fatalf("enumerated tile (%d,%d) fails OnCorridor", x, y)
+		if !OnCorridor(seed, gx, gy) || !Passable(seed, gx, gy) {
+			t.Fatalf("seed %d: goal (%d,%d) is not a passable corridor tile", seed, gx, gy)
 		}
-		n++
-	})
-}
-
-// With a small ring, the goal found by the scan is the only tile IsGoal
-// accepts among all corridor tiles in the ring, and it matches across runs.
-func TestGoalUnique(t *testing.T) {
-	const seed uint64 = 11
-	const rmin, rmax int64 = 10000, 30000
-	g := findGoal(seed, rmin, rmax, nil)
-	if g2 := findGoal(seed, rmin, rmax, nil); g2.X != g.X || g2.Y != g.Y || g2.Digest != g.Digest {
-		t.Fatalf("goal changed between runs: %+v vs %+v", g, g2)
-	}
-	if !isGoal(seed, g.Digest, g.X, g.Y, rmin, rmax) {
-		t.Fatalf("IsGoal rejects the goal found by the scan")
-	}
-	sx, sy := Start(seed)
-	if !Passable(seed, sx, sy) || !Passable(seed, g.X, g.Y) {
-		t.Fatalf("start or goal not passable")
-	}
-	matches := 0
-	cells := (rmax >> corridorShift) + 2
-	ci, cj := sx>>corridorShift, sy>>corridorShift
-	for j := cj - cells; j <= cj+cells; j++ {
-		for i := ci - cells; i <= ci+cells; i++ {
-			eachCorridorTile(seed, i, j, func(x, y int64) {
-				if x == g.X && y == g.Y {
-					return
-				}
-				if isGoal(seed, g.Digest, x, y, rmin, rmax) {
-					matches++
-				}
-			})
+		sx, sy := Start(seed)
+		d := math.Hypot(float64(gx-sx), float64(gy-sy))
+		if d < GoalMinDistance-2*CorridorCell || d > GoalMaxDistance+2*CorridorCell {
+			t.Fatalf("seed %d: goal is %.0f tiles from the start", seed, d)
+		}
+		if !IsGoal(seed, gx, gy) || IsGoal(seed, gx+1, gy) || IsGoal(seed, gx, gy-1) {
+			t.Fatalf("seed %d: IsGoal does not pick out exactly the goal", seed)
 		}
 	}
-	if matches != 0 {
-		t.Fatalf("%d other tiles pass IsGoal", matches)
-	}
-	t.Logf("goal (%d,%d) digest %s after hashing %d tiles", g.X, g.Y, g.Digest, g.Hashed)
 }

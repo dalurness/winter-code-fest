@@ -11,7 +11,7 @@ import "math"
 //
 // Corridors are a pure function of the seed, like everything else. They are
 // carved after all other terrain, so nothing can block them. The start and
-// the goal both lie on corridors, which is what makes every seed solvable.
+// the goal are both corridor nodes, which is what makes every seed solvable.
 //
 // Shape guarantees, which TestCorridorConnected checks:
 //   - A corridor is the band |s - off(t)| <= corridorHalfWidth around a centre
@@ -134,78 +134,6 @@ func OnCorridor(seed uint64, x, y int64) bool {
 		}
 	}
 	return false
-}
-
-// eachCorridorTile calls fn for every tile of the corridors owned by cell
-// (i, j): its node disc, its east corridor and its south corridor. Every
-// corridor tile of the map is owned by exactly one cell. A tile can be
-// reported more than once where corridors overlap near a node.
-func eachCorridorTile(seed uint64, i, j int64, fn func(x, y int64)) {
-	nx, ny := Node(seed, i, j)
-	const r = corridorNodeRadius
-	for dy := int64(-r); dy <= r; dy++ {
-		for dx := int64(-r); dx <= r; dx++ {
-			if dx*dx+dy*dy <= r*r {
-				fn(nx+dx, ny+dy)
-			}
-		}
-	}
-	eachEdgeTile(newEdge(seed, i, j, true), fn)
-	eachEdgeTile(newEdge(seed, i, j, false), fn)
-}
-
-// eachEdgeTile visits every tile in an edge's band exactly once. It walks
-// the centre line in quarter-tile steps and, for each line of tiles across
-// the major axis (columns for a horizontal edge, rows for a vertical one),
-// records a range that is sure to cover the band. Then it tests each tile in
-// those ranges against contains.
-//
-// Coverage: every band tile is within corridorHalfWidth of the centre line
-// at its own position along the edge, and samples are at most 0.125 tiles
-// apart along the edge. So it is within corridorHalfWidth+0.2 of some sample,
-// and the ±(half width + 1) window around each sample includes it.
-func eachEdgeTile(e edge, fn func(x, y int64)) {
-	const pad = corridorHalfWidth + 1
-	// a = major axis, b = minor axis, both relative to node A.
-	major := func(px, py float64) (float64, float64) {
-		if e.horizontal {
-			return px, py
-		}
-		return py, px
-	}
-	ea, _ := major(e.dx*e.length, e.dy*e.length)
-	a0 := int64(math.Floor(math.Min(0, ea) - e.reach - pad - 1))
-	a1 := int64(math.Ceil(math.Max(0, ea) + e.reach + pad + 1))
-	n := int(a1 - a0 + 1)
-	lo := make([]float64, n)
-	hi := make([]float64, n)
-	for k := range lo {
-		lo[k], hi[k] = math.Inf(1), math.Inf(-1)
-	}
-	for u := 0.0; u <= e.length+0.25; u += 0.25 {
-		cx, cy := e.centre(math.Min(u, e.length))
-		ca, cb := major(cx, cy)
-		for a := int64(math.Floor(ca - pad)); a <= int64(math.Ceil(ca+pad)); a++ {
-			k := a - a0
-			lo[k] = math.Min(lo[k], cb-pad)
-			hi[k] = math.Max(hi[k], cb+pad)
-		}
-	}
-	for k := 0; k < n; k++ {
-		if lo[k] > hi[k] {
-			continue
-		}
-		a := a0 + int64(k)
-		for b := int64(math.Ceil(lo[k])); b <= int64(math.Floor(hi[k])); b++ {
-			x, y := e.ax+a, e.ay+b
-			if !e.horizontal {
-				x, y = e.ax+b, e.ay+a
-			}
-			if e.contains(x, y) {
-				fn(x, y)
-			}
-		}
-	}
 }
 
 // EachCorridorLine calls fn at points every step tiles along the centre line

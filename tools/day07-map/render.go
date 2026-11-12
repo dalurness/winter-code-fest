@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"runtime"
 	"sync"
 
@@ -23,7 +22,6 @@ var palette = [17]rgb{
 var (
 	colStart    = rgb{255, 60, 60}
 	colGoal     = rgb{255, 40, 255}
-	colRegion   = rgb{255, 220, 60}
 	colCorridor = rgb{80, 230, 255}
 )
 
@@ -144,17 +142,18 @@ func (v view) pixel(x, y int64) (int, int, bool) {
 	return int(i), int(j), true
 }
 
-// overlay marks the start, the goal ring and (once found) the goal tile.
+// overlay marks the start and the goal.
 type overlay struct {
 	seed      uint64
 	sx, sy    int64
-	goal      *mapgen.Goal
+	gx, gy    int64
 	corridors bool // tint corridor tiles
 }
 
 func newOverlay(seed uint64) overlay {
 	sx, sy := mapgen.Start(seed)
-	return overlay{seed: seed, sx: sx, sy: sy}
+	gx, gy := mapgen.Goal(seed)
+	return overlay{seed: seed, sx: sx, sy: sy, gx: gx, gy: gy}
 }
 
 // mark is an overlay pixel: its colour and its ASCII character.
@@ -169,23 +168,8 @@ func (o overlay) marks(v view) map[[2]int]mark {
 	if o.corridors {
 		o.corridorMarks(v, m)
 	}
-	// Ring outline: pixels whose centre is within half a pixel of either
-	// circle.
-	half := float64(v.zoom)/2 + 0.5
-	for j := 0; j < v.h; j++ {
-		for i := 0; i < v.w; i++ {
-			cx := float64(v.x0-o.sx) + (float64(i)+0.5)*float64(v.zoom)
-			cy := float64(v.y0-o.sy) + (float64(j)+0.5)*float64(v.zoom)
-			d := math.Hypot(cx, cy)
-			if math.Abs(d-mapgen.RingMin) < half || math.Abs(d-mapgen.RingMax) < half {
-				m[[2]int{i, j}] = mark{colRegion, '*'}
-			}
-		}
-	}
-	if o.goal != nil {
-		if i, j, ok := v.pixel(o.goal.X, o.goal.Y); ok {
-			m[[2]int{i, j}] = mark{colGoal, 'E'}
-		}
+	if i, j, ok := v.pixel(o.gx, o.gy); ok {
+		m[[2]int{i, j}] = mark{colGoal, 'E'}
 	}
 	if i, j, ok := v.pixel(o.sx, o.sy); ok {
 		m[[2]int{i, j}] = mark{colStart, 'S'}
