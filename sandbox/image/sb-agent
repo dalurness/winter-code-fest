@@ -12,6 +12,10 @@
 # the program in front gets SIGWINCH, and anything that asks for the size
 # gets the new one.
 #
+# "close PORT" hangs up the terminal on ttyS<PORT> when the page closes it, as
+# closing a terminal tab does: its shell and whatever runs in it get SIGHUP,
+# and inittab starts a fresh login there for the next time it opens.
+#
 # The other way needs nothing in here: the page sees the guest's writes as
 # they reach v86's 9p server. Files are written back when closed; the shorter
 # writeback delay covers programs that keep a file open.
@@ -24,6 +28,7 @@ exec < /dev/ttyS2 > /dev/ttyS2 2>&1
 while read -r cmd port rows cols; do
   case "$cmd $port" in
     "size 0" | "size 1") stty -F "/dev/ttyS$port" rows "$rows" cols "$cols" 2>/dev/null ;;
+    "close 0" | "close 1") fuser -k -HUP "/dev/ttyS$port" > /dev/null 2>&1 ;;
     *)
       sb apply
       echo applied

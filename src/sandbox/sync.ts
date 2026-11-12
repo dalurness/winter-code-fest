@@ -89,6 +89,19 @@ export class GuestSync {
     );
   }
 
+  /**
+   * Hangs up a terminal the page closed, ending its shell and anything
+   * running in it. The guest starts a fresh login there.
+   */
+  hangUp(port: 0 | 1) {
+    clearTimeout(this.resizeTimers.get(port));
+    this.resizeTimers.delete(port);
+    this.vm.serial_send_bytes(
+      AGENT_PORT,
+      new TextEncoder().encode(`close ${port}\n`)
+    );
+  }
+
   private request() {
     this.applying = this.staged;
     this.staged = new Set();

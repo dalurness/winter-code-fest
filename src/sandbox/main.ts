@@ -54,6 +54,7 @@ const ui = {
   empty: $("empty"),
   pages: $("pages"),
   split: $<HTMLButtonElement>("split"),
+  terminals: $("terminals"),
   hidePanel: $<HTMLButtonElement>("hide-panel"),
   status: $("status"),
   cursor: $("cursor"),
@@ -1896,21 +1897,47 @@ async function reset() {
   setStatus("Reset to snapshot");
 }
 
-async function openSecondTerminal() {
-  if (!ready || !terms[1].element.hidden) return;
-  ui.split.disabled = true;
+/** Two terminals side by side can each be closed; one alone can only hide */
+function updateTerminals() {
+  const shown = terms.filter((t) => !t.element.hidden);
+  ui.split.disabled = !ready || shown.length === terms.length;
+  ui.terminals.classList.toggle("split", shown.length > 1);
+}
+
+async function openTerminal() {
+  const term = terms.find((t) => t.element.hidden);
+  if (!ready || !term) return;
   showPanel(true);
-  const term = terms[1];
+  // Drop what the fresh login printed while it was closed
+  term.reset();
   term.element.hidden = false;
+  updateTerminals();
   await attachShell(term);
   term.focus();
+}
+
+/** Closes one of two terminals, ending its shell like closing a terminal tab */
+function closeTerminal(term: SerialTerminal) {
+  const other = terms.find((t) => t !== term && !t.element.hidden);
+  if (!other || term.element.hidden) return;
+  term.element.hidden = true;
+  sync.hangUp(term.port);
+  term.reset();
+  activeTerm = other;
+  updateTerminals();
+  other.focus();
+}
+
+for (const term of terms) {
+  const close = term.element.querySelector<HTMLButtonElement>(".term-close")!;
+  close.onclick = () => closeTerminal(term);
 }
 
 ui.run.onclick = () => run();
 ui.bench.onclick = () => run({ bench: true });
 ui.refresh.onclick = refresh;
 ui.reset.onclick = reset;
-ui.split.onclick = openSecondTerminal;
+ui.split.onclick = openTerminal;
 ui.hidePanel.onclick = () => showPanel(false);
 
 // --- Keyboard shortcuts --------------------------------------------------
@@ -1948,7 +1975,7 @@ function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
     if (code === "KeyP" && !shift) return showQuickOpen;
     if ((code === "Backquote" || code === "KeyJ") && !shift)
       return () => showPanel();
-    if (code === "Backquote" && shift) return openSecondTerminal;
+    if (code === "Backquote" && shift) return openTerminal;
     if (code === "ArrowUp" && shift) return () => resizePanel(40);
     if (code === "ArrowDown" && shift) return () => resizePanel(-40);
     if (code === "KeyB" && !shift) return () => showSidebar();
@@ -2063,13 +2090,7 @@ if (Object.keys(work.saved.files).length)
 ui.empty.textContent =
   "Open a file from the explorer, or press Ctrl+P to find one.";
 
-for (const el of [
-  ui.refresh,
-  ui.reset,
-  ui.split,
-  ui.upload,
-  ui.newFile,
-  ui.newFolder,
-])
+updateTerminals();
+for (const el of [ui.refresh, ui.reset, ui.upload, ui.newFile, ui.newFolder])
   el.disabled = false;
 updateRunButton();
