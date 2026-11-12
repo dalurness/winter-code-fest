@@ -5,6 +5,10 @@
 // arguments, never on neighbouring tiles or on anything computed earlier, so
 // any tile anywhere in the int64 plane can be queried directly.
 //
+// Every seed is solvable: the start and the goal both lie on a corridor
+// network that is connected by construction (see corridor.go), and there is
+// exactly one goal tile (see goal.go).
+//
 // Heights run from -8 to 8. A height of 0 or less is passable air; 1 or more is
 // mountain. Movement is 4-directional (N, E, S, W): two passable tiles that
 // touch only at a corner are not connected.
@@ -102,7 +106,14 @@ func Elevation(seed uint64, x, y int64) float64 {
 	}
 
 	// Stamped shapes (crescents, craters, butte clusters, basins).
-	return stamps(seed, p.add(wx*40, wy*40), h)
+	h = stamps(seed, p.add(wx*40, wy*40), h)
+
+	// The corridor network is carved last so nothing can block it. Height
+	// rounds -0.2 to -2, so corridor tiles are always passable.
+	if OnCorridor(seed, x, y) {
+		h = math.Min(h, -0.2)
+	}
+	return h
 }
 
 // stamps overlays at most one hand-shaped feature per 512x512 cell. Each

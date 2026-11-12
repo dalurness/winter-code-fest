@@ -10,6 +10,7 @@ This folder is a standalone Go module. It is not part of the Astro site build. F
 - Heights run from **-8 to 8**. A height of **0 or less is passable air**; **1 or more is mountain**. The height only matters for drawing nicer maps.
 - **Movement is 4-directional** (north, east, south, west). Two air tiles that touch only at a corner are _not_ connected. There is no diagonal movement and no squeezing between mountains.
 - North is `-y`, the top of the screen, as in the original day 7.
+- **Every seed is solvable, with exactly one goal.** The start and the goal both lie on a corridor network that is connected by construction, and the goal is the corridor tile with the smallest SHA-256 digest in a ring around the start. See [DESIGN.md](./DESIGN.md#the-goal) for why the goal can't be worked out from the seed.
 - The same seed always gives the same map. `TestGolden` pins a checksum, so an accidental change to the generator fails the tests.
 
 ```go
@@ -17,9 +18,12 @@ import "wcf/day07-map/mapgen"
 
 h := mapgen.Height(seed, x, y)     // -8..8
 ok := mapgen.Passable(seed, x, y)  // h <= 0
-sx, sy := mapgen.Start(seed)       // first passable tile spiralling out from (0, 0)
-r := mapgen.GoalRegion(seed)       // public 4096x4096 square about 2^20 tiles away
-g := mapgen.IsGoal(seed, x, y)     // the goal test; see DESIGN.md
+sx, sy := mapgen.Start(seed)       // the corridor node of cell (0, 0)
+ok = mapgen.OnCorridor(seed, x, y) // part of the guaranteed-connected network
+ok = mapgen.InRing(seed, x, y)     // 2^18 <= distance from start < 2^19
+d, _ := mapgen.ParseDigest(hex)    // the published 64-character goal digest
+ok = mapgen.IsGoal(seed, d, x, y)  // true for exactly one tile
+g := mapgen.FindGoal(seed, nil)    // organisers: find the goal and its digest
 ```
 
 ## Running it
@@ -38,33 +42,33 @@ podman run --rm -it -v "$PWD/tools/day07-map":/src -w /src docker.io/library/gol
 
 Commands:
 
-| Command                    | What it does                                                                                                                                    |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `day07-map [view]`         | Interactive viewer (the default)                                                                                                                |
-| `day07-map dump`           | Prints one frame to stdout. Use `-style shade`, `-style ox` (O/X like day 7) or `-style color`                                                  |
-| `day07-map png -o map.png` | Renders a frame to a PNG (`-w`, `-h`, `-scale`)                                                                                                 |
-| `day07-map scan`           | Brute-forces the goal region and lists the goal tiles (about 50 ms). It also flood-fills around the start and each goal to catch sealed pockets |
-| `day07-map scan -find 100` | Tries 100 numeric seeds and lists the ones with exactly one goal tile                                                                           |
-| `day07-map stats`          | Passable fraction, height histogram and time per `Height()` call                                                                                |
-| `go test ./...`            | Determinism, golden checksum, far-coordinate and connectivity tests                                                                             |
+| Command                    | What it does                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `day07-map [view]`         | Interactive viewer (the default)                                                                                                                       |
+| `day07-map dump`           | Prints one frame to stdout. Use `-style shade`, `-style ox` (O/X like day 7) or `-style color`                                                         |
+| `day07-map png -o map.png` | Renders a frame to a PNG (`-w`, `-h`, `-scale`)                                                                                                        |
+| `day07-map scan`           | Finds the goal and prints its coordinates and the digest to publish. It hashes about 650 million corridor tiles: about 20 s on an idle 12-core machine |
+| `day07-map stats`          | Passable fraction, height histogram and time per `Height()` call                                                                                       |
+| `go test ./...`            | Determinism, golden checksum, far coordinates, terrain connectivity, corridor connectivity, corridor enumeration and goal uniqueness                   |
 
-Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two).
+Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-goal X,Y` (or `-goal find`, which runs the full search first) to mark the goal.
 
 ### Viewer keys
 
-| Key                                            | Action                                                             |
-| ---------------------------------------------- | ------------------------------------------------------------------ |
-| arrows, `w` `a` `s` `d`, `h` `j` `k` `l`       | Pan 4 pixels                                                       |
-| Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                                  |
-| `f`                                            | Toggle fast pan, so the normal pan keys move half a screen         |
-| `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                         |
-| `m`                                            | Cycle the drawing mode: colour half blocks, ASCII shades, O/X      |
-| `o` / `0`                                      | Jump to the start                                                  |
-| `g`                                            | Jump to the goal, or to the goal region while it is still scanning |
-| `?`                                            | Show or hide the help lines                                        |
-| `q`                                            | Quit                                                               |
+| Key                                            | Action                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------- |
+| arrows, `w` `a` `s` `d`, `h` `j` `k` `l`       | Pan 4 pixels                                                  |
+| Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                             |
+| `f`                                            | Toggle fast pan, so the normal pan keys move half a screen    |
+| `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                    |
+| `m`                                            | Cycle the drawing mode: colour half blocks, ASCII shades, O/X |
+| `o` / `0`                                      | Jump to the start                                             |
+| `g`                                            | Jump to the goal, once the background search has found it     |
+| `c`                                            | Highlight the corridor network                                |
+| `?`                                            | Show or hide the help lines                                   |
+| `q`                                            | Quit                                                          |
 
-The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal scan result and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` for plain ASCII. The start is red, the goal region outline is yellow and the goal tile is magenta.
+The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal search progress (or the goal once found) and the frame time. The viewer searches for the goal in the background as soon as it starts, using every CPU. Pass `-goal X,Y` to skip that. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` for plain ASCII. The start is red, the two edges of the goal ring are yellow, the goal tile is magenta and highlighted corridors are cyan.
 
 When zoomed out, each pixel samples up to 4×4 tiles. A pixel counts as mountain when most samples are mountain, so the passable/impassable split stays honest at every zoom.
 
@@ -73,6 +77,10 @@ When zoomed out, each pixel samples up to 4×4 tiles. A pixel counts as mountain
 Zoom 1:128, centred on the start. Massifs (brown) cover about half the map. Open lowlands (green and blue) are scattered with small mountains.
 
 ![Overview at zoom 1:128](docs/overview-z128.png)
+
+Zoom 1:32 with `-corridors`. The cyan lines are the guaranteed corridor network, one node per 8192×8192 cell. Without the highlight they look like any other 3–5 tile canyon.
+
+![Corridor network at zoom 1:32](docs/corridors-z32.png)
 
 Zoom 1:4: the edge of a massif. Canyons wind through it, a long range with snowy peaks runs along it, and crescents, craters and butte clusters are stamped on the lowland.
 
@@ -106,29 +114,10 @@ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOO
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOOOOXXXXXXXXXXXXXXXXO
 ```
 
-The goal for `north-pole` is at (1009734, -285247), about 1.05 million tiles from the start. Here it is at zoom 1:8, ringed in magenta. It sits in a hollow on the edge of a massif, reached through canyons. The yellow line is the top edge of the goal region:
+The whole goal ring at zoom 1:4096: the start (red), the ring between 262,144 and 524,288 tiles out (yellow), and the goal (magenta). At this zoom the terrain is just noise:
+
+![Goal ring at zoom 1:4096](docs/ring-z4096.png)
+
+`scan` finds the goal for `north-pole` at (-117825, -254570), 284,476 tiles from the start, with digest `0000000d977a6440d8d0288e30f21e9bd6c2799dc7b8030f2a68322d0837babb`. Here it is at zoom 1:8 with corridors highlighted. It lies on a north–south corridor through open lowland:
 
 ![Goal area at zoom 1:8](docs/goal-z8.png)
-
-The same spot as shaded ASCII at zoom 1:4 (`dump -x 1009734 -y -285247 -zoom 4 -w 90 -h 18`). A space is low air, `.` and `,` are air close to the limit, `+` is a low mountain, `#` is higher, and `E` is the goal. The `+` block on the left is the massif's flank:
-
-```
-.,+#######++++++++++++++++++++        #                               #  #+###############
-.+++#######++++++++++++++++++++           #                           ##   ###+  +  +#####
-,+++#####++++++++++++++++++++++                                   +   ##  #####  #+#######
-++++######+++++++++++++++++++++                       +     +  #      #   #+   +   +######
-+++++###++++++++++++++++++++++++                     +    +   ####  #     ###    #########
-++++++++++++++++++++++++++++++++                 #   + ++     #  # +#        + ## ##+#####
-++++++++++++++++++++++++++++++++                    ####         ###          +   # +#####
-+++++++++++++++++++++++++++++++++                        ###+####### #  #           +#####
-.++++++++++++++++++++++++++++++++                     + +### ##+#+##  #     +       +#####
-.,++++++++++++++++++++++++++++++++           E        ++     +######  ##    #       +#####
- .,+++++++++++++++++++++++++++++++                               # ##  ###+        ++#####
-. .,+++++++++++++++++++++++++++++++                                  +            ++######
-.  .++++++++++++++++++++++++++++++++                                   +       ## ++######
-.. .,+++++++++++++++++++++++++++++++                                         #  ++++######
- .. .,+++++++++++++++++++++++++++++++                                       ##+   ++######
-. .  .,+++++++++++++++++++++++++++++++                                            +#######
-,    .,,+++++++++++++++++++++++++++++++                                           +#######
-,,    .+++++++++++++++++++++++++++++++++                                         +########
-```

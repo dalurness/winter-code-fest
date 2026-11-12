@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"runtime"
 	"sync"
 
@@ -20,9 +21,10 @@ var palette = [17]rgb{
 }
 
 var (
-	colStart  = rgb{255, 60, 60}
-	colGoal   = rgb{255, 40, 255}
-	colRegion = rgb{255, 220, 60}
+	colStart    = rgb{255, 60, 60}
+	colGoal     = rgb{255, 40, 255}
+	colRegion   = rgb{255, 220, 60}
+	colCorridor = rgb{80, 230, 255}
 )
 
 func heightColor(h int) rgb { return palette[h-mapgen.MinHeight] }
@@ -142,47 +144,46 @@ func (v view) pixel(x, y int64) (int, int, bool) {
 	return int(i), int(j), true
 }
 
-// overlay marks the start, the goal region outline and any known goal tiles.
+// overlay marks the start, the goal ring and (once found) the goal tile.
 type overlay struct {
-	sx, sy int64
-	region mapgen.Rect
-	goals  [][2]int64
+	seed      uint64
+	sx, sy    int64
+	goal      *mapgen.Goal
+	corridors bool // tint corridor tiles
 }
 
 func newOverlay(seed uint64) overlay {
 	sx, sy := mapgen.Start(seed)
-	return overlay{sx: sx, sy: sy, region: mapgen.GoalRegion(seed)}
+	return overlay{seed: seed, sx: sx, sy: sy}
 }
 
-// marks returns a sparse map of pixel -> colour/char for the overlay.
+// mark is an overlay pixel: its colour and its ASCII character.
 type mark struct {
 	c  rgb
 	ch byte
 }
 
+// marks returns a sparse map of pixel -> mark for the overlay.
 func (o overlay) marks(v view) map[[2]int]mark {
 	m := map[[2]int]mark{}
-	// Region outline: walk the edges of the rect at pixel resolution.
-	r := o.region
-	edge := func(x, y int64) {
-		if i, j, ok := v.pixel(x, y); ok {
-			m[[2]int{i, j}] = mark{colRegion, '*'}
+	if o.corridors {
+		o.corridorMarks(v, m)
+	}
+	// Ring outline: pixels whose centre is within half a pixel of either
+	// circle.
+	half := float64(v.zoom)/2 + 0.5
+	for j := 0; j < v.h; j++ {
+		for i := 0; i < v.w; i++ {
+			cx := float64(v.x0-o.sx) + (float64(i)+0.5)*float64(v.zoom)
+			cy := float64(v.y0-o.sy) + (float64(j)+0.5)*float64(v.zoom)
+			d := math.Hypot(cx, cy)
+			if math.Abs(d-mapgen.RingMin) < half || math.Abs(d-mapgen.RingMax) < half {
+				m[[2]int{i, j}] = mark{colRegion, '*'}
+			}
 		}
 	}
-	step := v.zoom
-	clamp := func(a, lo, hi int64) int64 { return max(lo, min(a, hi)) }
-	// only walk the visible part of each edge
-	vx1, vy1 := v.x0+int64(v.w)*v.zoom, v.y0+int64(v.h)*v.zoom
-	for x := clamp(v.x0, r.X0, r.X1-1); x <= clamp(vx1, r.X0, r.X1-1); x += step {
-		edge(x, r.Y0)
-		edge(x, r.Y1-1)
-	}
-	for y := clamp(v.y0, r.Y0, r.Y1-1); y <= clamp(vy1, r.Y0, r.Y1-1); y += step {
-		edge(r.X0, y)
-		edge(r.X1-1, y)
-	}
-	for _, g := range o.goals {
-		if i, j, ok := v.pixel(g[0], g[1]); ok {
+	if o.goal != nil {
+		if i, j, ok := v.pixel(o.goal.X, o.goal.Y); ok {
 			m[[2]int{i, j}] = mark{colGoal, 'E'}
 		}
 	}
@@ -190,4 +191,27 @@ func (o overlay) marks(v view) map[[2]int]mark {
 		m[[2]int{i, j}] = mark{colStart, 'S'}
 	}
 	return m
+}
+
+// corridorMarks tints pixels that contain a corridor tile. At zoom 1 it
+// tests every tile. Zoomed out, sampled tiles could miss a corridor 3-5
+// tiles wide, so it walks each corridor's centre line instead.
+func (o overlay) corridorMarks(v view, m map[[2]int]mark) {
+	if v.zoom == 1 {
+		for j := 0; j < v.h; j++ {
+			for i := 0; i < v.w; i++ {
+				if mapgen.OnCorridor(o.seed, v.x0+int64(i), v.y0+int64(j)) {
+					m[[2]int{i, j}] = mark{colCorridor, '='}
+				}
+			}
+		}
+		return
+	}
+	// Zoomed out: sample each corridor's centre line.
+	mapgen.EachCorridorLine(o.seed, v.x0, v.y0, v.x0+int64(v.w)*v.zoom, v.y0+int64(v.h)*v.zoom, float64(v.zoom)/2,
+		func(x, y int64) {
+			if i, j, ok := v.pixel(x, y); ok {
+				m[[2]int{i, j}] = mark{colCorridor, '='}
+			}
+		})
 }

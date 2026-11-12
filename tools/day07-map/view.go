@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -69,15 +70,15 @@ func asciiFrame(v view, hs [][]int, marks map[[2]int]mark, ox bool) string {
 }
 
 type viewer struct {
-	seedStr string
-	seed    uint64
-	x, y    int64 // centre tile
-	zoom    int64
-	fast    bool
-	mode    int // 0 half blocks, 1 shade ASCII, 2 O/X ASCII
-	help    bool
-	ov      overlay
-	scanned bool
+	seedStr  string
+	seed     uint64
+	x, y     int64 // centre tile
+	zoom     int64
+	fast     bool
+	mode     int // 0 half blocks, 1 shade ASCII, 2 O/X ASCII
+	help     bool
+	ov       overlay
+	progress string // goal search progress, "" once found
 }
 
 var modeNames = []string{"blocks", "ascii", "O/X"}
@@ -106,12 +107,34 @@ func runView(args []string) {
 	defer restore()
 	os.Stdout.WriteString("\x1b[?1049h\x1b[?25l")
 
-	v := &viewer{seedStr: c.seedStr, seed: c.seed, x: c.x, y: c.y, zoom: c.zoom, ov: newOverlay(c.seed)}
+	if c.goal == "find" {
+		c.goal = "" // the viewer always searches in the background
+	}
+	v := &viewer{seedStr: c.seedStr, seed: c.seed, x: c.x, y: c.y, zoom: c.zoom, ov: c.overlay()}
 
 	keys := make(chan string, 64)
 	go readKeys(keys)
-	goals := make(chan [][2]int64, 1)
-	go func() { goals <- mapgen.Scan(v.seed) }()
+	goals := make(chan mapgen.Goal, 1)
+	progress := make(chan string, 1)
+	if v.ov.goal == nil {
+		v.progress = "finding goal"
+		go func() {
+			var mu sync.Mutex
+			last := time.Now()
+			goals <- mapgen.FindGoal(v.seed, func(done, total int) {
+				mu.Lock()
+				defer mu.Unlock()
+				if time.Since(last) < time.Second {
+					return
+				}
+				last = time.Now()
+				select {
+				case progress <- fmt.Sprintf("finding goal %d%%", 100*done/total):
+				default:
+				}
+			})
+		}()
+	}
 	winch := make(chan os.Signal, 1)
 	signal.Notify(winch, syscall.SIGWINCH)
 
@@ -134,7 +157,12 @@ func runView(args []string) {
 				}
 			}
 		case g := <-goals:
-			v.ov.goals, v.scanned = g, true
+			v.ov.goal, v.progress = &g, ""
+		case p := <-progress:
+			if v.progress == "" {
+				continue
+			}
+			v.progress = p
 		case <-winch:
 		}
 		v.draw()
@@ -223,12 +251,11 @@ func (v *viewer) key(k string) bool {
 	case "0", "o":
 		v.x, v.y = v.ov.sx, v.ov.sy
 	case "g":
-		if len(v.ov.goals) > 0 {
-			v.x, v.y = v.ov.goals[0][0], v.ov.goals[0][1]
-		} else {
-			r := v.ov.region
-			v.x, v.y = (r.X0+r.X1)/2, (r.Y0+r.Y1)/2
+		if v.ov.goal != nil {
+			v.x, v.y = v.ov.goal.X, v.ov.goal.Y
 		}
+	case "c":
+		v.ov.corridors = !v.ov.corridors
 	case "?":
 		v.help = !v.help
 	}
@@ -254,7 +281,7 @@ func (v *viewer) size() (int, int) {
 
 var helpLines = []string{
 	" arrows/WASD/hjkl pan   Shift+arrow or capital WASD/HJKL pan half a screen   f toggle fast pan",
-	" +/z zoom in   -/x zoom out   m cycle blocks/ascii/O-X   o start   g goal   ? help   q quit",
+	" +/z zoom in   -/x zoom out   m cycle blocks/ascii/O-X   c corridors   o start   g goal   ? help   q quit",
 }
 
 func (v *viewer) draw() {
@@ -286,9 +313,9 @@ func (v *viewer) draw() {
 	if ht > 0 {
 		kind = "mountain"
 	}
-	goal := "scanning"
-	if v.scanned {
-		goal = fmt.Sprintf("%d goal", len(v.ov.goals))
+	goal := v.progress
+	if v.ov.goal != nil {
+		goal = fmt.Sprintf("goal (%d, %d)", v.ov.goal.X, v.ov.goal.Y)
 	}
 	fast := ""
 	if v.fast {

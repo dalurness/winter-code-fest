@@ -4,7 +4,7 @@
 //	day07-map [view] [flags]   interactive terminal viewer (default)
 //	day07-map dump [flags]     print one frame to stdout and exit
 //	day07-map png -o FILE      render a frame to a PNG image
-//	day07-map scan [flags]     brute-force the goal region for goal tiles
+//	day07-map scan [flags]     find the goal tile and its digest (about a minute)
 //	day07-map stats [flags]    passable fraction and Height() speed
 package main
 
@@ -15,6 +15,7 @@ import (
 	"hash/fnv"
 	"image"
 	"image/png"
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -39,6 +40,8 @@ type common struct {
 	x, y    int64
 	zoom    int64
 	set     map[string]bool
+	goal    string
+	corr    bool
 }
 
 func addCommon(fs *flag.FlagSet, c *common) {
@@ -46,6 +49,40 @@ func addCommon(fs *flag.FlagSet, c *common) {
 	fs.Int64Var(&c.x, "x", 0, "centre x (default: the start tile)")
 	fs.Int64Var(&c.y, "y", 0, "centre y (default: the start tile)")
 	fs.Int64Var(&c.zoom, "zoom", 1, "tiles per pixel (rounded down to a power of two)")
+	fs.StringVar(&c.goal, "goal", "", `mark the goal: "X,Y" if you know it, or "find" to search for it (about a minute)`)
+	fs.BoolVar(&c.corr, "corridors", false, "highlight the corridor network")
+}
+
+// overlay builds the overlay for the common flags.
+func (c *common) overlay() overlay {
+	ov := newOverlay(c.seed)
+	ov.corridors = c.corr
+	switch {
+	case c.goal == "find":
+		g := findGoalWithProgress(c.seed)
+		ov.goal = &g
+	case c.goal != "":
+		var g mapgen.Goal
+		if _, err := fmt.Sscanf(c.goal, "%d,%d", &g.X, &g.Y); err != nil {
+			fmt.Fprintln(os.Stderr, `-goal wants "X,Y" or "find"`)
+			os.Exit(2)
+		}
+		ov.goal = &g
+	}
+	return ov
+}
+
+// findGoalWithProgress runs FindGoal, printing progress to stderr.
+func findGoalWithProgress(seed uint64) mapgen.Goal {
+	var last time.Time
+	g := mapgen.FindGoal(seed, func(done, total int) {
+		if time.Since(last) > 500*time.Millisecond || done == total {
+			last = time.Now()
+			fmt.Fprintf(os.Stderr, "\rfinding goal: %d/%d cells", done, total)
+		}
+	})
+	fmt.Fprintln(os.Stderr)
+	return g
 }
 
 func (c *common) finish(fs *flag.FlagSet) {
@@ -100,8 +137,7 @@ func runDump(args []string) {
 
 	out := bufio.NewWriter(os.Stdout)
 	defer out.Flush()
-	ov := newOverlay(c.seed)
-	ov.goals = mapgen.Scan(c.seed)
+	ov := c.overlay()
 	if *style == "color" {
 		v := centred(c, *w, *h*2)
 		out.WriteString(halfBlocks(v, v.heights(), ov.marks(v), false))
@@ -147,8 +183,7 @@ func runPNG(args []string) {
 
 	v := centred(c, *w, *h)
 	hs := v.heights()
-	ov := newOverlay(c.seed)
-	ov.goals = mapgen.Scan(c.seed)
+	ov := c.overlay()
 	marks := ov.marks(v)
 	s := *scale
 	img := image.NewRGBA(image.Rect(0, 0, *w*s, *h*s))
@@ -199,64 +234,18 @@ func runPNG(args []string) {
 func runScan(args []string) {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	seedStr := fs.String("seed", "north-pole", "map seed")
-	find := fs.Int("find", 0, "instead, try this many numeric seeds from -seed upward and list those with exactly one goal")
 	fs.Parse(args)
-	if *find > 0 {
-		base := parseSeed(*seedStr)
-		for i := 0; i < *find; i++ {
-			s := base + uint64(i)
-			if g := mapgen.Scan(s); len(g) == 1 {
-				fmt.Printf("seed %d: goal at (%d,%d)\n", s, g[0][0], g[0][1])
-			}
-		}
-		return
-	}
 	seed := parseSeed(*seedStr)
 	sx, sy := mapgen.Start(seed)
-	r := mapgen.GoalRegion(seed)
 	t := time.Now()
-	goals := mapgen.Scan(seed)
+	g := findGoalWithProgress(seed)
 	fmt.Printf("seed:        %s (%d)\n", *seedStr, seed)
-	fmt.Printf("start:       (%d,%d) %s\n", sx, sy, openness(seed, sx, sy))
-	fmt.Printf("goal region: x %d..%d, y %d..%d (%dx%d)\n", r.X0, r.X1-1, r.Y0, r.Y1-1, r.X1-r.X0, r.Y1-r.Y0)
-	fmt.Printf("scanned in:  %v\n", time.Since(t).Round(time.Millisecond))
-	fmt.Printf("goal tiles:  %d\n", len(goals))
-	for _, g := range goals {
-		fmt.Printf("  (%d,%d) height %d %s\n", g[0], g[1], mapgen.Height(seed, g[0], g[1]), openness(seed, g[0], g[1]))
-	}
-}
-
-// escapeRadius is how far openness floods before calling a tile open.
-const escapeRadius = 1024
-
-// openness flood-fills (4-directionally) from a tile within a square of
-// radius escapeRadius. Reaching the square's edge means the tile is not in a
-// small sealed pocket. It does not prove that start and goal are connected:
-// only a real solver can show that.
-func openness(seed uint64, x, y int64) string {
-	const n = 2*escapeRadius + 1
-	seen := make([]bool, n*n)
-	idx := func(dx, dy int64) int { return int(dy+escapeRadius)*n + int(dx+escapeRadius) }
-	stack := [][2]int64{{0, 0}}
-	seen[idx(0, 0)] = true
-	count := 0
-	for len(stack) > 0 {
-		c := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		count++
-		for _, d := range [4][2]int64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-			a, b := c[0]+d[0], c[1]+d[1]
-			if a < -escapeRadius || a > escapeRadius || b < -escapeRadius || b > escapeRadius {
-				return fmt.Sprintf("(open: escapes a %d-tile radius)", escapeRadius)
-			}
-			if seen[idx(a, b)] || !mapgen.Passable(seed, x+a, y+b) {
-				continue
-			}
-			seen[idx(a, b)] = true
-			stack = append(stack, [2]int64{a, b})
-		}
-	}
-	return fmt.Sprintf("(SEALED: pocket of %d tiles)", count)
+	fmt.Printf("start:       (%d,%d)\n", sx, sy)
+	fmt.Printf("goal ring:   %d <= distance from start < %d\n", mapgen.RingMin, mapgen.RingMax)
+	fmt.Printf("hashed:      %d corridor tiles in %v\n", g.Hashed, time.Since(t).Round(time.Second))
+	fmt.Printf("goal:        (%d,%d), %.0f tiles from the start\n", g.X, g.Y, math.Hypot(float64(g.X-sx), float64(g.Y-sy)))
+	fmt.Printf("goal digest: %s\n", g.Digest)
+	fmt.Printf("check:       IsGoal=%v Height=%d\n", mapgen.IsGoal(seed, g.Digest, g.X, g.Y), mapgen.Height(seed, g.X, g.Y))
 }
 
 func runStats(args []string) {
