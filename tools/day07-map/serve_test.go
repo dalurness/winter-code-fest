@@ -13,7 +13,7 @@ import (
 func TestServe(t *testing.T) {
 	const seed = 7
 	var out bytes.Buffer
-	in := "chunk -3 5 4 2\nchunk 10 -20 3 2 raw\nchunk 0 0 2 1 heights\ntile 1 2\nbogus\nchunk 0 0 0 5\nquit\ntile 0 0\n"
+	in := "chunk -3 5 4 2\nchunk 10 -20 3 2 raw\nchunk 0 0 2 1 heights\ntile 1 2\nisgoal 1 2\nbogus\nchunk 0 0 0 5\nquit\ntile 0 0\n"
 	serve(strings.NewReader(in), &out, seed, "ox")
 	r := bufio.NewReader(&out)
 	line := func() string {
@@ -58,6 +58,9 @@ func TestServe(t *testing.T) {
 	line()
 	if got := line(); got != "ok "+strconv.Itoa(mapgen.Height(seed, 1, 2)) {
 		t.Fatalf("tile reply %q", got)
+	}
+	if got := line(); got != "ok false" {
+		t.Fatalf("isgoal reply %q", got)
 	}
 	if got := line(); !strings.HasPrefix(got, "error ") {
 		t.Fatalf("bogus reply %q", got)

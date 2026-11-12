@@ -113,6 +113,16 @@ RUN for dir in /workspace/*/; do \
     for log in /tmp/warm.*.log; do echo "== $log"; cat "$log"; done; \
     rm /tmp/warm.*.log; exit $failed
 
+# The advanced day 7 map tool and its readme go in days/07/advanced, which the
+# page fills in around at startup. Built with the image's Go from
+# tools/day07-map, which build.sh passes in as the day07map build context.
+COPY --from=day07map . /tmp/day07-map
+COPY day07-advanced/README.md /workspace/days/07/advanced/README.md
+RUN cd /tmp/day07-map \
+ && GOFLAGS= GOCACHE=/tmp/day07-cache GOMODCACHE=/tmp/day07-mod go build -trimpath -ldflags "-s -w" \
+      -o /workspace/days/07/advanced/day07-map . \
+ && cd / && rm -rf /tmp/day07-map /tmp/day07-cache /tmp/day07-mod && bundle-mark day07
+
 # Remove what the VM can never use, after the warm-up so it still builds:
 # - bundle-mark's working files
 # - apk and alpine-conf: there is no network to install packages from

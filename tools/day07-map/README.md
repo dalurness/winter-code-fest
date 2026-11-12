@@ -82,6 +82,7 @@ The generator is a Go package, but a solver can be written in anything. Run `day
 | `chunk X Y W H [FORMAT]` | `ok W H FORMAT`, then the W×H tiles whose top-left corner is (X, Y) |
 | `tile X Y`               | `ok HEIGHT`                                                         |
 | `start` / `goal`         | `ok X Y`                                                            |
+| `isgoal X Y`             | `ok true` or `ok false`, for the extra-hard version                 |
 | `seed`                   | `ok SEED` (the numeric seed)                                        |
 | `quit`                   | Exits. So does closing stdin                                        |
 

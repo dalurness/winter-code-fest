@@ -88,6 +88,7 @@ func runChunk(args []string) {
 //	tile X Y                "ok HEIGHT"
 //	start                   "ok X Y"
 //	goal                    "ok X Y"
+//	isgoal X Y              "ok true" or "ok false"
 //	seed                    "ok SEED"
 //	quit                    exits (so does closing stdin)
 func runServe(args []string) {
@@ -170,10 +171,16 @@ func handle(out *bufio.Writer, seed uint64, format string, f []string) error {
 	case "goal":
 		x, y := mapgen.Goal(seed)
 		fmt.Fprintf(out, "ok %d %d\n", x, y)
+	case "isgoal":
+		n, err := ints(2)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "ok %t\n", mapgen.IsGoal(seed, n[0], n[1]))
 	case "seed":
 		fmt.Fprintf(out, "ok %d\n", seed)
 	default:
-		return fmt.Errorf("unknown request %q (want chunk, tile, start, goal, seed or quit)", f[0])
+		return fmt.Errorf("unknown request %q (want chunk, tile, start, goal, isgoal, seed or quit)", f[0])
 	}
 	return nil
 }

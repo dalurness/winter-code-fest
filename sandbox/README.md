@@ -26,7 +26,7 @@ The page is [src/pages/sandbox/index.astro](../src/pages/sandbox/index.astro) wi
 
 **Run** runs the open file: with its starter project's `run.sh` if it is in one, otherwise with the toolchain for its extension. Community solutions run from their day's folder, so relative paths to the input files work.
 
-Every day's question, input files and community solutions are added to `/workspace/days/NN/` when the page starts, from [src/pages/sandbox/content.json.ts](../src/pages/sandbox/content.json.ts). They are not in the image, so a new day or solution only needs a site deploy. Input files are fetched from the site's `/day/NN/` only when the VM reads them. Each solution's code blocks are also saved as `solution.<ext>` files. `sqlite` and `zstd` are installed for day 14's database.
+Every day's question, input files and community solutions are added to `/workspace/days/NN/` when the page starts, from [src/pages/sandbox/content.json.ts](../src/pages/sandbox/content.json.ts). They are not in the image, so a new day or solution only needs a site deploy. Input files are fetched from the site's `/day/NN/` only when the VM reads them. Each solution's code blocks are also saved as `solution.<ext>` files. `sqlite` and `zstd` are installed for day 14's database. The one exception is `days/07/advanced/`: the image builds the advanced day 7 map tool from [tools/day07-map](../tools/day07-map) into it, with the readme in [image/day07-advanced](image/day07-advanced). The page adds the rest of day 7 around it.
 
 `/sandbox/?day=NN` opens a day's page and `/sandbox/?day=NN&solution=name` a solution's, for the site's pages to link to. Each opens the real page in a tab; its links to input files open the VM's copy, and its sandbox links open the solution's code.
 
