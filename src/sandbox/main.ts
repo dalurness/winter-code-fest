@@ -200,7 +200,10 @@ function applySettings() {
         .trim()
     );
   monaco.editor.setTheme(EDITOR_THEMES[theme]);
-  terms.forEach((t) => t.setTheme(TERMINAL_THEMES[theme]));
+  terms.forEach((t) => {
+    t.setTheme(TERMINAL_THEMES[theme]);
+    t.setFontSize(settings.terminalFontSize);
+  });
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
     wordWrap: wordWrap(),
@@ -211,7 +214,13 @@ function applySettings() {
   ui.autoSave.hidden = false;
 
   const form = ui.settings.elements;
-  for (const name of ["theme", "autoSave", "fontSize", "benchRuns"] as const) {
+  for (const name of [
+    "theme",
+    "autoSave",
+    "fontSize",
+    "terminalFontSize",
+    "benchRuns",
+  ] as const) {
     (form.namedItem(name) as HTMLInputElement).value = String(settings[name]);
   }
   for (const name of [
@@ -237,9 +246,9 @@ ui.settings.addEventListener("input", (event) => {
   const input = event.target as HTMLInputElement | HTMLSelectElement;
   if (input instanceof HTMLInputElement && input.type === "checkbox") {
     updateSettings({ [input.name]: input.checked });
-  } else if (input.name === "fontSize") {
+  } else if (input.name === "fontSize" || input.name === "terminalFontSize") {
     const size = Number(input.value);
-    if (size >= 8 && size <= 32) updateSettings({ fontSize: size });
+    if (size >= 8 && size <= 32) updateSettings({ [input.name]: size });
   } else if (input.name === "benchRuns") {
     const runs = Number(input.value);
     if (Number.isInteger(runs) && runs >= 1 && runs <= 20)

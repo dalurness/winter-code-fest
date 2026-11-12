@@ -114,7 +114,6 @@ const median = (values: number[]) =>
 export class SerialTerminal {
   readonly term = new Terminal({
     fontFamily: "ui-monospace, Menlo, Consolas, monospace",
-    fontSize: 13,
     cursorBlink: true,
     scrollback: 5000,
   });
@@ -226,6 +225,13 @@ export class SerialTerminal {
 
   setTheme(theme: ITheme) {
     this.term.options.theme = theme;
+  }
+
+  /** Refits right away, since the element keeps its size and its observer stays quiet */
+  setFontSize(size: number) {
+    if (this.term.options.fontSize === size) return;
+    this.term.options.fontSize = size;
+    if (!this.element.hidden) this.fit.fit();
   }
 
   get size() {
