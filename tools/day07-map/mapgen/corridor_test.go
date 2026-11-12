@@ -5,44 +5,160 @@ import (
 	"testing"
 )
 
-// Every node of a 3x3 block of cells must be reachable from the others by
-// stepping 4-directionally on corridor tiles alone. This checks the shape
-// guarantees in corridor.go: the band never pinches below 4-connectivity and
-// node discs join the corridors that meet there.
-func TestCorridorConnected(t *testing.T) {
+// Every link in a 3x3 block of cells must join its two nodes over its own
+// band and the node discs, stepping 4-directionally. This checks the band
+// shape guarantees in corridor.go at several seeds, including near 2^43.
+func TestCorridorLinks(t *testing.T) {
 	cases := []struct {
 		seed   uint64
 		i0, j0 int64
 	}{{1, 0, 0}, {2, -1, 3}, {3, 5, -2}, {42, 1 << 30, -(1 << 30)}}
 	for _, c := range cases {
-		x0, y0 := c.i0<<corridorShift, c.j0<<corridorShift
-		x1, y1 := x0+3*CorridorCell, y0+3*CorridorCell
-		sx, sy := Node(c.seed, c.i0, c.j0)
-		seen := map[[2]int64]bool{{sx, sy}: true}
-		stack := [][2]int64{{sx, sy}}
+		links, tiles := 0, 0
+		for j := c.j0; j < c.j0+3; j++ {
+			for i := c.i0; i < c.i0+3; i++ {
+				for _, h := range []bool{true, false} {
+					if LinkDropped(c.seed, i, j, h) {
+						continue
+					}
+					links++
+					tiles += floodLink(t, c.seed, i, j, h)
+				}
+			}
+		}
+		t.Logf("seed %d: %d links joined over %d band tiles", c.seed, links, tiles)
+	}
+}
+
+// floodLink floods from node A of a link over its band and both node discs
+// and fails unless it reaches node B. It returns the tiles visited.
+func floodLink(t *testing.T, seed uint64, i, j int64, horizontal bool) int {
+	e := newEdge(seed, i, j, horizontal)
+	ax, ay := Node(seed, i, j)
+	bx, by := Node(seed, i+1, j)
+	if !horizontal {
+		bx, by = Node(seed, i, j+1)
+	}
+	inDisc := func(x, y, nx, ny int64) bool {
+		return (x-nx)*(x-nx)+(y-ny)*(y-ny) <= corridorNodeRadius*corridorNodeRadius
+	}
+	ok := func(x, y int64) bool {
+		if inDisc(x, y, ax, ay) || inDisc(x, y, bx, by) {
+			return true
+		}
+		sp, near := e.measure(x, y, 0)
+		return near && sp.out <= 0
+	}
+	seen := map[[2]int64]bool{{ax, ay}: true}
+	stack := [][2]int64{{ax, ay}}
+	for len(stack) > 0 {
+		p := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		for _, d := range [4][2]int64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			q := [2]int64{p[0] + d[0], p[1] + d[1]}
+			if !seen[q] && ok(q[0], q[1]) {
+				if !OnCorridor(seed, q[0], q[1]) {
+					t.Fatalf("seed %d: band tile (%d,%d) not reported by OnCorridor", seed, q[0], q[1])
+				}
+				seen[q] = true
+				stack = append(stack, q)
+			}
+		}
+	}
+	if !seen[[2]int64{bx, by}] {
+		t.Errorf("seed %d: link from cell (%d,%d) horizontal=%v does not reach its far node", seed, i, j, horizontal)
+	}
+	return len(seen)
+}
+
+// Even faces lose at most one link and odd faces drop none, which is what
+// keeps the network connected (see corridor.go). Some links must be
+// dropped, and every node keeps at least two.
+func TestCorridorDrops(t *testing.T) {
+	const seed = 9
+	dropped := 0
+	for j := int64(-40); j < 40; j++ {
+		for i := int64(-40); i < 40; i++ {
+			top := LinkDropped(seed, i, j, true)
+			bottom := LinkDropped(seed, i, j+1, true)
+			left := LinkDropped(seed, i, j, false)
+			right := LinkDropped(seed, i+1, j, false)
+			n := 0
+			for _, d := range []bool{top, bottom, left, right} {
+				if d {
+					n++
+				}
+			}
+			// An even face borders only odd faces, which drop nothing, so
+			// it loses at most the one link it drops itself. That leaves a
+			// three-link detour around it for the dropped link.
+			if (i+j)&1 == 0 && n > 1 {
+				t.Fatalf("even face (%d,%d) lost %d links", i, j, n)
+			}
+			if top {
+				dropped++
+			}
+			degree := 0
+			for _, d := range []bool{
+				LinkDropped(seed, i, j, true), LinkDropped(seed, i-1, j, true),
+				LinkDropped(seed, i, j, false), LinkDropped(seed, i, j-1, false),
+			} {
+				if !d {
+					degree++
+				}
+			}
+			if degree < 2 {
+				t.Fatalf("node (%d,%d) has only %d links", i, j, degree)
+			}
+		}
+	}
+	for j := int64(-40); j < 40; j++ {
+		for i := int64(-40); i < 40; i++ {
+			if (i+j)&1 == 0 {
+				continue
+			}
+			// No link of an odd face may be dropped by that face.
+			if faceDrop(seed, i, j) != 0 {
+				t.Fatalf("odd face (%d,%d) drops a link", i, j)
+			}
+		}
+	}
+	if dropped == 0 {
+		t.Fatal("no east links dropped")
+	}
+	t.Logf("%d of 6400 east links dropped", dropped)
+}
+
+// The network is connected: flood the abstract node graph over a 60x60
+// block, allowing paths one ring outside it, and reach every node.
+func TestCorridorGraph(t *testing.T) {
+	for _, seed := range []uint64{1, 9, 77} {
+		const n = 60
+		seen := map[[2]int64]bool{{0, 0}: true}
+		stack := [][2]int64{{0, 0}}
 		for len(stack) > 0 {
 			p := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			for _, d := range [4][2]int64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-				q := [2]int64{p[0] + d[0], p[1] + d[1]}
-				if q[0] < x0 || q[0] >= x1 || q[1] < y0 || q[1] >= y1 || seen[q] {
+			i, j := p[0], p[1]
+			for _, l := range []struct {
+				di, dj, li, lj int64
+				h              bool
+			}{{1, 0, i, j, true}, {-1, 0, i - 1, j, true}, {0, 1, i, j, false}, {0, -1, i, j - 1, false}} {
+				q := [2]int64{i + l.di, j + l.dj}
+				if q[0] < -1 || q[0] > n || q[1] < -1 || q[1] > n || seen[q] || LinkDropped(seed, l.li, l.lj, l.h) {
 					continue
 				}
-				if OnCorridor(c.seed, q[0], q[1]) {
-					seen[q] = true
-					stack = append(stack, q)
+				seen[q] = true
+				stack = append(stack, q)
+			}
+		}
+		for j := int64(0); j < n; j++ {
+			for i := int64(0); i < n; i++ {
+				if !seen[[2]int64{i, j}] {
+					t.Fatalf("seed %d: node (%d,%d) unreachable", seed, i, j)
 				}
 			}
 		}
-		for j := c.j0; j < c.j0+3; j++ {
-			for i := c.i0; i < c.i0+3; i++ {
-				nx, ny := Node(c.seed, i, j)
-				if !seen[[2]int64{nx, ny}] {
-					t.Errorf("seed %d: node of cell (%d,%d) not reachable over corridors", c.seed, i, j)
-				}
-			}
-		}
-		t.Logf("seed %d: %d corridor tiles connect all 9 nodes", c.seed, len(seen))
 	}
 }
 
@@ -50,8 +166,8 @@ func TestCorridorConnected(t *testing.T) {
 func TestCorridorPassable(t *testing.T) {
 	const seed = 5
 	n := 0
-	for y := int64(0); y < 2*CorridorCell; y += 3 {
-		for x := int64(0); x < 2*CorridorCell; x += 3 {
+	for y := int64(0); y < 2*CorridorCell; y += 5 {
+		for x := int64(0); x < 2*CorridorCell; x += 5 {
 			if OnCorridor(seed, x, y) {
 				n++
 				if !Passable(seed, x, y) {

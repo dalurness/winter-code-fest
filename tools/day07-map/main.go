@@ -5,6 +5,8 @@
 //	day07-map dump [flags]     print one frame to stdout and exit
 //	day07-map png -o FILE      render a frame to a PNG image
 //	day07-map goal [flags]     print the start and goal tiles
+//	day07-map chunk [flags]    print a rectangle of tiles for other programs
+//	day07-map serve [flags]    answer chunk requests on stdin/stdout
 //	day07-map stats [flags]    passable fraction and Height() speed
 package main
 
@@ -92,8 +94,12 @@ func main() {
 		runGoal(args)
 	case "stats":
 		runStats(args)
+	case "chunk":
+		runChunk(args)
+	case "serve":
+		runServe(args)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q (want view, dump, png, goal or stats)\n", cmd)
+		fmt.Fprintf(os.Stderr, "unknown command %q (want view, dump, png, goal, stats, chunk or serve)\n", cmd)
 		os.Exit(2)
 	}
 }

@@ -40,14 +40,16 @@ podman run --rm -it -v "$PWD/tools/day07-map":/src -w /src docker.io/library/gol
 
 Commands:
 
-| Command                    | What it does                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `day07-map [view]`         | Interactive viewer (the default)                                                                                                     |
-| `day07-map dump`           | Prints one frame to stdout. Use `-style shade`, `-style ox` (O/X like day 7) or `-style color`                                       |
-| `day07-map png -o map.png` | Renders a frame to a PNG (`-w`, `-h`, `-scale`)                                                                                      |
-| `day07-map goal`           | Prints the start and goal tiles                                                                                                      |
-| `day07-map stats`          | Passable fraction, height histogram and time per `Height()` call                                                                     |
-| `go test ./...`            | Determinism, golden checksum, far coordinates, terrain connectivity, corridor connectivity, corridor enumeration and goal uniqueness |
+| Command                    | What it does                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `day07-map [view]`         | Interactive viewer (the default)                                                                                   |
+| `day07-map dump`           | Prints one frame to stdout. Use `-style shade`, `-style ox` (O/X like day 7) or `-style color`                     |
+| `day07-map png -o map.png` | Renders a frame to a PNG (`-w`, `-h`, `-scale`)                                                                    |
+| `day07-map goal`           | Prints the start and goal tiles                                                                                    |
+| `day07-map stats`          | Passable fraction, height histogram and time per `Height()` call                                                   |
+| `day07-map chunk`          | Prints a rectangle of tiles for other programs (`-x`, `-y` top-left, `-w`, `-h`, `-format`); see below             |
+| `day07-map serve`          | Answers chunk requests on stdin/stdout so any language can read the map; see below                                 |
+| `go test ./...`            | Determinism, golden checksum, far coordinates, terrain and corridor connectivity, the goal and the server protocol |
 
 Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network.
 
@@ -70,13 +72,56 @@ The status line shows the seed, the centre tile with its height, the zoom, the m
 
 When zoomed out, each pixel samples up to 4×4 tiles. A pixel counts as mountain when most samples are mountain, so the passable/impassable split stays honest at every zoom.
 
+## Reading the map from other languages
+
+The generator is a Go package, but a solver can be written in anything. Run `day07-map serve` as a child process, write requests to its stdin one per line, and read the replies from its stdout. Each reply starts with one header line, `ok ...` or `error <message>`, so a client always knows what follows.
+
+| Request                  | Reply                                                               |
+| ------------------------ | ------------------------------------------------------------------- |
+| `chunk X Y W H [FORMAT]` | `ok W H FORMAT`, then the W×H tiles whose top-left corner is (X, Y) |
+| `tile X Y`               | `ok HEIGHT`                                                         |
+| `start` / `goal`         | `ok X Y`                                                            |
+| `seed`                   | `ok SEED` (the numeric seed)                                        |
+| `quit`                   | Exits. So does closing stdin                                        |
+
+Chunk formats (the default is set with `serve -format`, and is `ox` unless you change it):
+
+- `ox`: H lines of W characters, `O` for passable and `X` for mountain, as in the original day 7.
+- `heights`: H lines of W heights separated by spaces.
+- `raw`: exactly W×H bytes, row by row, each height as a signed byte. This is the fastest to parse.
+
+A chunk can be up to 4096×4096 tiles, computed across all CPUs. A 1024×1024 chunk takes about 0.3 s on 12 cores. Ask for chunks rather than single tiles: `tile` is fine for spot checks, but one request per tile spends far more time on the pipe than on the map.
+
+```python
+import subprocess
+
+srv = subprocess.Popen(["./day07-map", "serve", "-seed", "north-pole", "-format", "raw"],
+                       stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+def ask(line):
+    srv.stdin.write((line + "\n").encode())
+    srv.stdin.flush()
+    head = srv.stdout.readline().decode().split()
+    if head[0] != "ok":
+        raise RuntimeError(" ".join(head[1:]))
+    return head[1:]
+
+sx, sy = map(int, ask("start"))
+w, h = 256, 256
+ask(f"chunk {sx - w // 2} {sy - h // 2} {w} {h}")
+data = srv.stdout.read(w * h)  # row by row
+passable = lambda x, y: (data[y * w + x] ^ 0x80) - 0x80 <= 0  # signed byte
+```
+
+For a single rectangle, `day07-map chunk -x X -y Y -w W -h H -format ox` prints it without the header line. Don't port the generator to another language: it relies on Go's exact floating-point results, so a port could disagree about the odd tile.
+
 ## Gallery (seed `north-pole`)
 
 Zoom 1:128, centred on the start. Massifs (brown) cover about half the map. Open lowlands (green and blue) are scattered with small mountains.
 
 ![Overview at zoom 1:128](docs/overview-z128.png)
 
-Zoom 1:32 with `-corridors`. The cyan lines are the guaranteed corridor network, one node per 8192×8192 cell. Without the highlight they look like any other 3–5 tile canyon.
+Zoom 1:32 with `-corridors`. The cyan lines are the guaranteed corridor network: one node per 8192×8192 cell, meandering links, and about one link in eight left out.
 
 ![Corridor network at zoom 1:32](docs/corridors-z32.png)
 
@@ -87,6 +132,14 @@ Zoom 1:4: the edge of a massif. Canyons wind through it, a long range with snowy
 Zoom 1:1 inside a massif. The only ways through are canyons, which vary from 2–3 tile slots to broad valleys.
 
 ![Canyons at zoom 1:1](docs/canyons-z1.png)
+
+Zoom 1:1 inside a massif, east of the start. One of these valleys is a guaranteed corridor and the rest are natural canyons. Can you tell which?
+
+![Valleys at zoom 1:1](docs/corridor-valley-z1.png)
+
+The same view with `-corridors`. The corridor's core band is highlighted; its walls blend into the rock like the canyons' do.
+
+![The same valleys with the corridor highlighted](docs/corridor-valley-z1-marked.png)
 
 Zoom 1:2 on the lowland: a crescent and scattered small mountains.
 
@@ -116,6 +169,6 @@ The start (red, centre) and the goal (magenta, right) at zoom 1:2048. At this zo
 
 ![Start and goal at zoom 1:2048](docs/start-goal-z2048.png)
 
-The goal for `north-pole` is at (322493, -86438), 330,002 tiles from the start. Here it is at zoom 1:8 with corridors highlighted: a four-way corridor junction in the middle of a massif's canyon maze.
+The goal for `north-pole` is at (322493, -86438), 330,002 tiles from the start. Here it is at zoom 1:8 with corridors highlighted: a three-way corridor junction (the link east is one of the dropped ones) in the middle of a massif's canyon maze.
 
 ![Goal area at zoom 1:8](docs/goal-z8.png)

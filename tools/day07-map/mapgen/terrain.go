@@ -107,12 +107,9 @@ func Elevation(seed uint64, x, y int64) float64 {
 	// Stamped shapes (crescents, craters, butte clusters, basins).
 	h = stamps(seed, p.add(wx*40, wy*40), h)
 
-	// The corridor network is carved last so nothing can block it. Height
-	// rounds -0.2 to -2, so corridor tiles are always passable.
-	if OnCorridor(seed, x, y) {
-		h = math.Min(h, -0.2)
-	}
-	return h
+	// The corridor network is carved last so nothing can block it. Its core
+	// floor is at most -0.07, which rounds to a passable height.
+	return carveCorridors(seed, x, y, h, 0.07*detail)
 }
 
 // stamps overlays at most one hand-shaped feature per 512x512 cell. Each

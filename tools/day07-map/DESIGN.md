@@ -24,20 +24,27 @@ The layers, from biggest to smallest:
 
 **Shape of a typical map** (seed `north-pole`, 1M samples spread over 16M × 16M tiles): about 44% passable. The natural terrain is well connected but not fully. A flood fill over 1536×1536 windows finds 68–99% of the air in one 4-connected component (`TestConnectivity`). The rest is sealed pockets, such as canyon loops cut off by a range or the inside of a crater whose gaps open onto rock. These pockets are deliberate traps for solvers that assume everything connects. The corridor network is what guarantees a route between the start and the goal.
 
-**Cost.** A `Height` call costs about 570 ns on one core, about 120 ns of it for the corridor check. That's about 37 ms for a 256×256 chunk, or roughly 27 chunks per second per core.
+**Cost.** A `Height` call costs about 600 ns on one idle core, about 150 ns of it for the corridors. That's about 40 ms for a 256×256 chunk, or roughly 25 chunks per second per core.
 
 ## The corridor network
 
-The plane is cut into 8192×8192 cells. Each cell has one **node** at a seed-chosen spot in the middle half of the cell. Every node is joined to its east and south neighbours (and so to all four) by a **corridor**: a band of air at least 3 tiles thick that wiggles sideways around the straight line between the two nodes. A disc of radius 4 around each node joins the ends of its four corridors. A grid in which every node links to its neighbours is connected, so **every corridor tile can reach every other corridor tile**.
+The plane is cut into 8192×8192 cells. Each cell has one **node** at a seed-chosen spot in the middle half of the cell. Nodes are joined to their east and south neighbours by **corridors**, and about one link in eight is left out so the network isn't a full grid. The network is connected by construction, so **every corridor tile can reach every other corridor tile**.
+
+Corridors are meant to pass for natural valleys:
+
+- **The centre line meanders.** Its sideways offset from the straight line between the nodes is a sum of six octaves of 1D gradient noise. They range from one or two big bends per cell (wavelength 3000 tiles, amplitude up to 1100) down to bends every hundred tiles and a wobble every dozen or so. The big octaves fade out towards the nodes, so the line meets them.
+- **Width, depth and walls vary.** The guaranteed band is 3–12 tiles wide (half-width 1.6–6), and the floor sits at heights -1 to -4. Outside the band the terrain slopes down into the valley at a rate that changes along the corridor, from gentle valleys to steep gorges, and noise roughens the walls.
+- **Corridors only lower the land.** Where the terrain is already low, a corridor leaves no mark. You only see one where it cuts through high ground, and there it looks like one more canyon.
 
 The guarantees come from the shape. `mapgen/corridor.go` has the details and `corridor_test.go` checks them:
 
-- The wiggle is a sum of two sine waves times `sin(πt)`, so it is zero at both nodes. Its amplitude is scaled from the frequencies so the slope is at most 0.9, which keeps the band at least 2·2/√(1+0.81) ≈ 3 tiles thick at any angle. That's enough to stay 4-connected (`TestCorridorConnected` floods 3×3 blocks of cells using corridor tiles only and reaches every node, including at coordinates near 2^43).
-- The wiggle is at most about 0.11 cells, and nodes sit in the middle half of their cell, so a corridor never leaves the two cells it joins. `OnCorridor(seed, x, y)` therefore only has to check the node disc and four corridors of the tile's own cell, which keeps it a cheap, pure function.
-- Corridors are carved after the ranges and stamps, by capping elevation at -0.2 (height -2). Nothing can block them (`TestCorridorPassable`).
+- **The graph stays connected with links dropped.** Picture the squares (faces) between four neighbouring nodes. Faces where i+j is even may drop one of their four links; odd faces never drop any. Every link borders one even and one odd face. A planar graph only falls apart when its removed edges form a cycle in the dual graph, and here every even face touches at most one removed link, so no cycle can form. Each dropped link keeps a three-link detour around its face, and every node keeps at least two links (`TestCorridorDrops`, `TestCorridorGraph`).
+- **Each link is 4-connected.** An east link is the set of tiles within the half-width of the centre line, measured perpendicular to it. Measured vertically, that's `w·√(1+c′²)` with the slope capped at 8 in that correction. Each column holds at least 3 tiles. The vertical half-width also grows faster than the centre line can move between columns, so adjacent columns always share a tile, at any slope. South links swap x and y. `TestCorridorLinks` floods every link of 3×3 blocks of cells over its own band and reaches the far node, including near 2^43.
+- **A tile only checks its own cell.** Nodes sit in the middle half of their cell and the centre line strays at most 1700 tiles from the straight line, so a link and its walls never leave the two cells it joins. `OnCorridor(seed, x, y)` checks the node disc and four links, and the octaves are evaluated largest first, stopping early once the line can't come close enough. Tiles already below every possible floor skip the corridors entirely.
+- **Nothing can block a corridor.** Corridors are carved after the ranges and stamps, and the band is set to its floor, which is always passable (`TestCorridorPassable`).
 - `Start(seed)` is the node of cell (0, 0) and `Goal(seed)` is another node, so both are always on the network.
 
-Without the highlight, corridors look like any other narrow canyon. At low zoom with `-corridors` on, their grid layout is plain to see. The corridor code is public, so solvers can find them too; see below for why that's fine.
+At low zoom with `-corridors` on, the network shows as a loose, wandering mesh of about one link per cell side. Without the highlight, a corridor in a massif looks like one more canyon. The corridor code is public, so solvers can find them too; see below for why that's fine.
 
 ## The goal
 
