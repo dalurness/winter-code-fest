@@ -137,7 +137,7 @@ export class SerialTerminal {
 
   constructor(
     private vm: Emulator,
-    private port: 0 | 1,
+    readonly port: 0 | 1,
     readonly element: HTMLElement,
     private counter: InstructionCounter,
     status: (text: string) => void

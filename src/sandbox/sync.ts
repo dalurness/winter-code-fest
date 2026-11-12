@@ -6,6 +6,8 @@ const AGENT_PORT = 2;
 const AGENT_TIMEOUT_MS = 5000;
 /** At most this often the editor hears about the guest's writes */
 const CHANGE_DELAY_MS = 150;
+/** Dragging a sash resizes a terminal many times; only the last size goes */
+const RESIZE_DELAY_MS = 100;
 
 export interface GuestChanges {
   /** Inodes whose contents the guest wrote or truncated */
@@ -39,6 +41,7 @@ export class GuestSync {
   private line = "";
   private changes: GuestChanges = emptyChanges();
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private resizeTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
   constructor(
     private vm: Emulator,
@@ -65,6 +68,25 @@ export class GuestSync {
   /** Whether the guest may still have an older copy than the editor saved */
   isApplying(path: string) {
     return this.staged.has(path) || this.applying.has(path);
+  }
+
+  /**
+   * Tells the guest a terminal's size, as a terminal emulator does with a
+   * pseudo-terminal, so the program in front gets SIGWINCH. A serial line
+   * has no way to carry it.
+   */
+  resize(port: 0 | 1, rows: number, cols: number) {
+    clearTimeout(this.resizeTimers.get(port));
+    this.resizeTimers.set(
+      port,
+      setTimeout(() => {
+        this.resizeTimers.delete(port);
+        this.vm.serial_send_bytes(
+          AGENT_PORT,
+          new TextEncoder().encode(`size ${port} ${rows} ${cols}\n`)
+        );
+      }, RESIZE_DELAY_MS)
+    );
   }
 
   private request() {
