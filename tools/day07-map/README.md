@@ -71,6 +71,18 @@ Every map command takes `-seed` (a number or any string; strings are hashed), `-
 
 The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` to switch to O/X characters, drawn in the palette's colours on the terminal's own background. The start is red, the goal is magenta and highlighted corridors are cyan.
 
+The viewer at zoom 1:4 on the start, in colour blocks:
+
+![The viewer in colour blocks](docs/viewer-blocks.png)
+
+Zoom 1:32 with the dark palette, corridors highlighted (`c`) and the help lines shown (`?`):
+
+![The viewer with the dark palette and corridors](docs/viewer-dark.png)
+
+O/X mode (`m`) at zoom 1:1, on the corridor from the gallery below:
+
+![The viewer in O/X mode](docs/viewer-ox.png)
+
 When zoomed out, each pixel samples up to 4×4 tiles. A pixel counts as mountain when most samples are mountain, so the passable/impassable split stays honest at every zoom.
 
 ## Reading the map from other languages
