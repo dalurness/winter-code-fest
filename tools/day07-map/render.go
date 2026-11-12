@@ -19,6 +19,14 @@ var palette = [17]rgb{
 	{128, 122, 116}, {160, 158, 156}, {200, 200, 204}, {244, 246, 250},
 }
 
+// darkAir replaces the air half of the palette for the dark style: deep
+// valleys are near black and air at height 0 is a dark grey, so the
+// coloured mountains stand out.
+var darkAir = [9]rgb{
+	{8, 8, 10}, {13, 13, 15}, {18, 18, 21}, {23, 23, 27}, {29, 29, 33},
+	{35, 35, 40}, {42, 42, 47}, {49, 49, 55}, {57, 57, 63},
+}
+
 var (
 	colStart    = rgb{255, 60, 60}
 	colGoal     = rgb{255, 40, 255}
@@ -26,6 +34,14 @@ var (
 )
 
 func heightColor(h int) rgb { return palette[h-mapgen.MinHeight] }
+
+// styleColor is heightColor, with dark grey air when dark is set.
+func styleColor(h int, dark bool) rgb {
+	if dark && h <= 0 {
+		return darkAir[h-mapgen.MinHeight]
+	}
+	return heightColor(h)
+}
 
 // ASCII ramps used by the plain renderers.
 func shadeChar(h int) byte {

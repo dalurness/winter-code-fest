@@ -51,22 +51,22 @@ Commands:
 | `day07-map serve`          | Answers chunk requests on stdin/stdout so any language can read the map; see below                                 |
 | `go test ./...`            | Determinism, golden checksum, far coordinates, terrain and corridor connectivity, the goal and the server protocol |
 
-Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network.
+Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-dark` to draw air in dark greys so the mountains stand out (the viewer starts in its dark mode; `png` and `dump -style color` use it too).
 
 ### Viewer keys
 
-| Key                                            | Action                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------- |
-| arrows, `w` `a` `s` `d`, `h` `j` `k` `l`       | Pan 4 pixels                                                  |
-| Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                             |
-| `f`                                            | Toggle fast pan, so the normal pan keys move half a screen    |
-| `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                    |
-| `m`                                            | Cycle the drawing mode: colour half blocks, ASCII shades, O/X |
-| `o` / `0`                                      | Jump to the start                                             |
-| `g`                                            | Jump to the goal                                              |
-| `c`                                            | Highlight the corridor network                                |
-| `?`                                            | Show or hide the help lines                                   |
-| `q`                                            | Quit                                                          |
+| Key                                            | Action                                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| arrows, `w` `a` `s` `d`, `h` `j` `k` `l`       | Pan 4 pixels                                                                                        |
+| Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                                                                   |
+| `f`                                            | Toggle fast pan, so the normal pan keys move half a screen                                          |
+| `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                                                          |
+| `m`                                            | Cycle the drawing mode: colour half blocks, dark half blocks (air in dark greys), ASCII shades, O/X |
+| `o` / `0`                                      | Jump to the start                                                                                   |
+| `g`                                            | Jump to the goal                                                                                    |
+| `c`                                            | Highlight the corridor network                                                                      |
+| `?`                                            | Show or hide the help lines                                                                         |
+| `q`                                            | Quit                                                                                                |
 
 The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` for plain ASCII. The start is red, the goal is magenta and highlighted corridors are cyan.
 

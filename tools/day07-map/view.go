@@ -16,14 +16,15 @@ import (
 
 // halfBlocks renders a view whose height is two pixels per text row using
 // "▀" with a truecolor foreground (top pixel) and background (bottom pixel).
-// With cross set, the centre pixel is drawn as a crosshair.
-func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool) string {
+// With cross set, the centre pixel is drawn as a crosshair; with dark set,
+// air is drawn in dark greys.
+func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross, dark bool) string {
 	var b strings.Builder
 	col := func(i, j int) rgb {
 		if m, ok := marks[[2]int{i, j}]; ok {
 			return m.c
 		}
-		return heightColor(hs[j][i])
+		return styleColor(hs[j][i], dark)
 	}
 	cx, cy := v.w/2, v.h/2
 	for j := 0; j+1 < v.h; j += 2 {
@@ -74,12 +75,12 @@ type viewer struct {
 	x, y    int64 // centre tile
 	zoom    int64
 	fast    bool
-	mode    int // 0 half blocks, 1 shade ASCII, 2 O/X ASCII
+	mode    int // 0 half blocks, 1 dark half blocks, 2 shade ASCII, 3 O/X ASCII
 	help    bool
 	ov      overlay
 }
 
-var modeNames = []string{"blocks", "ascii", "O/X"}
+var modeNames = []string{"blocks", "dark", "ascii", "O/X"}
 
 func runView(args []string) {
 	fs := flag.NewFlagSet("view", flag.ExitOnError)
@@ -106,6 +107,9 @@ func runView(args []string) {
 	os.Stdout.WriteString("\x1b[?1049h\x1b[?25l")
 
 	v := &viewer{seedStr: c.seedStr, seed: c.seed, x: c.x, y: c.y, zoom: c.zoom, ov: c.overlay()}
+	if c.dark {
+		v.mode = 1
+	}
 
 	keys := make(chan string, 64)
 	go readKeys(keys)
@@ -238,7 +242,7 @@ func (v *viewer) size() (int, int) {
 		rows -= len(helpLines)
 	}
 	rows = max(rows, 1)
-	if v.mode == 0 {
+	if v.mode <= 1 {
 		return cols, rows * 2
 	}
 	return cols, rows
@@ -246,7 +250,7 @@ func (v *viewer) size() (int, int) {
 
 var helpLines = []string{
 	" arrows/WASD/hjkl pan   Shift+arrow or capital WASD/HJKL pan half a screen   f toggle fast pan",
-	" +/z zoom in   -/x zoom out   m cycle blocks/ascii/O-X   c corridors   o start   g goal   ? help   q quit",
+	" +/z zoom in   -/x zoom out   m cycle blocks/dark/ascii/O-X   c corridors   o start   g goal   ? help   q quit",
 }
 
 func (v *viewer) draw() {
@@ -258,10 +262,10 @@ func (v *viewer) draw() {
 	marks := v.ov.marks(vw)
 	var frame string
 	switch v.mode {
-	case 0:
-		frame = halfBlocks(vw, hs, marks, true)
+	case 0, 1:
+		frame = halfBlocks(vw, hs, marks, true, v.mode == 1)
 	default:
-		frame = asciiFrame(vw, hs, marks, v.mode == 2)
+		frame = asciiFrame(vw, hs, marks, v.mode == 3)
 	}
 	el := time.Since(t)
 
