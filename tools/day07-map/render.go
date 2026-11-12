@@ -35,12 +35,43 @@ var (
 
 func heightColor(h int) rgb { return palette[h-mapgen.MinHeight] }
 
-// styleColor is heightColor, with dark grey air when dark is set.
-func styleColor(h int, dark bool) rgb {
-	if dark && h <= 0 {
+// Palettes for drawing tiles.
+const (
+	palColor = iota // full colour: teal and green air, brown to snow mountains
+	palDark         // dark grey air, coloured mountains
+	palMono         // black air, white mountains
+)
+
+var paletteNames = []string{"color", "dark", "mono"}
+
+func parsePalette(s string) (int, bool) {
+	for i, n := range paletteNames {
+		if n == s {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// tileColor is the colour of height h in palette pal.
+func tileColor(h, pal int) rgb {
+	switch {
+	case pal == palMono && h <= 0:
+		return rgb{0, 0, 0}
+	case pal == palMono:
+		return rgb{255, 255, 255}
+	case pal == palDark && h <= 0:
 		return darkAir[h-mapgen.MinHeight]
 	}
 	return heightColor(h)
+}
+
+// textOn picks black or white text for legibility on background c.
+func textOn(c rgb) rgb {
+	if 299*int(c.r)+587*int(c.g)+114*int(c.b) > 128*1000 {
+		return rgb{0, 0, 0}
+	}
+	return rgb{255, 255, 255}
 }
 
 // ASCII ramps used by the plain renderers.

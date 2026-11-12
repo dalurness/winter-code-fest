@@ -43,7 +43,7 @@ type common struct {
 	zoom    int64
 	set     map[string]bool
 	corr    bool
-	dark    bool
+	pal     int
 }
 
 func addCommon(fs *flag.FlagSet, c *common) {
@@ -52,7 +52,14 @@ func addCommon(fs *flag.FlagSet, c *common) {
 	fs.Int64Var(&c.y, "y", 0, "centre y (default: the start tile)")
 	fs.Int64Var(&c.zoom, "zoom", 1, "tiles per pixel (rounded down to a power of two)")
 	fs.BoolVar(&c.corr, "corridors", false, "highlight the corridor network")
-	fs.BoolVar(&c.dark, "dark", false, "draw air in dark greys so mountains stand out")
+	fs.Func("palette", "colours: color, dark (grey air) or mono (black air, white mountains)", func(s string) error {
+		p, ok := parsePalette(s)
+		if !ok {
+			return fmt.Errorf("want color, dark or mono")
+		}
+		c.pal = p
+		return nil
+	})
 }
 
 // overlay builds the overlay for the common flags.
@@ -121,7 +128,7 @@ func runDump(args []string) {
 	ov := c.overlay()
 	if *style == "color" {
 		v := centred(c, *w, *h*2)
-		out.WriteString(halfBlocks(v, v.heights(), ov.marks(v), false, c.dark))
+		out.WriteString(halfBlocks(v, v.heights(), ov.marks(v), false, c.pal))
 		return
 	}
 	v := centred(c, *w, *h)
@@ -170,7 +177,7 @@ func runPNG(args []string) {
 	img := image.NewRGBA(image.Rect(0, 0, *w*s, *h*s))
 	for j, row := range hs {
 		for i, ht := range row {
-			col := styleColor(ht, c.dark)
+			col := tileColor(ht, c.pal)
 			if m, ok := marks[[2]int{i, j}]; ok {
 				col = m.c
 			}

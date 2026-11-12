@@ -15,16 +15,15 @@ import (
 )
 
 // halfBlocks renders a view whose height is two pixels per text row using
-// "▀" with a truecolor foreground (top pixel) and background (bottom pixel).
-// With cross set, the centre pixel is drawn as a crosshair; with dark set,
-// air is drawn in dark greys.
-func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross, dark bool) string {
+// "▀" with a truecolor foreground (top pixel) and background (bottom pixel),
+// in palette pal. With cross set, the centre pixel is drawn as a crosshair.
+func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) string {
 	var b strings.Builder
 	col := func(i, j int) rgb {
 		if m, ok := marks[[2]int{i, j}]; ok {
 			return m.c
 		}
-		return styleColor(hs[j][i], dark)
+		return tileColor(hs[j][i], pal)
 	}
 	cx, cy := v.w/2, v.h/2
 	for j := 0; j+1 < v.h; j += 2 {
@@ -36,7 +35,8 @@ func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross, dark bool) str
 				if j+1 == cy {
 					bg = t
 				}
-				fmt.Fprintf(&b, "\x1b[38;2;255;255;255;48;2;%d;%d;%dm+", bg.r, bg.g, bg.b)
+				fg := textOn(bg)
+				fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm+", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b)
 				continue
 			}
 			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm▀", t.r, t.g, t.b, u.r, u.g, u.b)
@@ -46,23 +46,21 @@ func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross, dark bool) str
 	return b.String()
 }
 
-// asciiFrame renders one character per pixel, coloured if colour is on.
-func asciiFrame(v view, hs [][]int, marks map[[2]int]mark, ox bool) string {
+// oxFrame renders one O (air) or X (mountain) per pixel, on a background
+// coloured by palette pal.
+func oxFrame(v view, hs [][]int, marks map[[2]int]mark, pal int) string {
 	var b strings.Builder
 	for j, row := range hs {
 		for i, ht := range row {
-			ch := shadeChar(ht)
-			if ox {
-				ch = oxChar(ht)
-			}
-			c := heightColor(ht)
+			ch, bg := oxChar(ht), tileColor(ht, pal)
 			if m, ok := marks[[2]int{i, j}]; ok {
-				ch, c = m.ch, m.c
+				ch, bg = m.ch, m.c
 			}
 			if i == v.w/2 && j == v.h/2 {
 				ch = '+'
 			}
-			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm%c", c.r, c.g, c.b, ch)
+			fg := textOn(bg)
+			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%c", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b, ch)
 		}
 		b.WriteString("\x1b[0m\r\n")
 	}
@@ -75,12 +73,11 @@ type viewer struct {
 	x, y    int64 // centre tile
 	zoom    int64
 	fast    bool
-	mode    int // 0 half blocks, 1 dark half blocks, 2 shade ASCII, 3 O/X ASCII
+	ox      bool // O/X characters instead of half blocks
+	pal     int
 	help    bool
 	ov      overlay
 }
-
-var modeNames = []string{"blocks", "dark", "ascii", "O/X"}
 
 func runView(args []string) {
 	fs := flag.NewFlagSet("view", flag.ExitOnError)
@@ -107,9 +104,7 @@ func runView(args []string) {
 	os.Stdout.WriteString("\x1b[?1049h\x1b[?25l")
 
 	v := &viewer{seedStr: c.seedStr, seed: c.seed, x: c.x, y: c.y, zoom: c.zoom, ov: c.overlay()}
-	if c.dark {
-		v.mode = 1
-	}
+	v.pal = c.pal
 
 	keys := make(chan string, 64)
 	go readKeys(keys)
@@ -218,7 +213,9 @@ func (v *viewer) key(k string) bool {
 			v.zoom *= 2
 		}
 	case "m":
-		v.mode = (v.mode + 1) % len(modeNames)
+		v.ox = !v.ox
+	case "p":
+		v.pal = (v.pal + 1) % len(paletteNames)
 	case "0", "o":
 		v.x, v.y = v.ov.sx, v.ov.sy
 	case "g":
@@ -242,7 +239,7 @@ func (v *viewer) size() (int, int) {
 		rows -= len(helpLines)
 	}
 	rows = max(rows, 1)
-	if v.mode <= 1 {
+	if !v.ox {
 		return cols, rows * 2
 	}
 	return cols, rows
@@ -250,7 +247,7 @@ func (v *viewer) size() (int, int) {
 
 var helpLines = []string{
 	" arrows/WASD/hjkl pan   Shift+arrow or capital WASD/HJKL pan half a screen   f toggle fast pan",
-	" +/z zoom in   -/x zoom out   m cycle blocks/dark/ascii/O-X   c corridors   o start   g goal   ? help   q quit",
+	" +/z zoom in   -/x zoom out   m blocks/O-X   p palette   c corridors   o start   g goal   ? help   q quit",
 }
 
 func (v *viewer) draw() {
@@ -261,11 +258,10 @@ func (v *viewer) draw() {
 	hs := vw.heights()
 	marks := v.ov.marks(vw)
 	var frame string
-	switch v.mode {
-	case 0, 1:
-		frame = halfBlocks(vw, hs, marks, true, v.mode == 1)
-	default:
-		frame = asciiFrame(vw, hs, marks, v.mode == 3)
+	if v.ox {
+		frame = oxFrame(vw, hs, marks, v.pal)
+	} else {
+		frame = halfBlocks(vw, hs, marks, true, v.pal)
 	}
 	el := time.Since(t)
 
@@ -283,12 +279,16 @@ func (v *viewer) draw() {
 		kind = "mountain"
 	}
 	goal := fmt.Sprintf("goal (%d, %d)", v.ov.gx, v.ov.gy)
+	mode := "blocks " + paletteNames[v.pal]
+	if v.ox {
+		mode = "O/X " + paletteNames[v.pal]
+	}
 	fast := ""
 	if v.fast {
 		fast = " FAST"
 	}
 	status := fmt.Sprintf(" seed %s | (%d, %d) h=%d %s | zoom 1:%d | %s%s | %s | %dms | ? help, q quit",
-		v.seedStr, v.x, v.y, ht, kind, v.zoom, modeNames[v.mode], fast, goal, el.Milliseconds())
+		v.seedStr, v.x, v.y, ht, kind, v.zoom, mode, fast, goal, el.Milliseconds())
 	b.WriteString("\x1b[0;7m" + pad(status, w) + "\x1b[0m")
 	os.Stdout.WriteString(b.String())
 }
