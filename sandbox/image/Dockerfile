@@ -1,6 +1,17 @@
 # Based on v86's tools/docker/alpine/Dockerfile (copy/v86@cc37f35c), bumped to
 # Alpine 3.24 for nodejs-current 26. v86 has no 64-bit or PAE support, so the
 # whole image is 32-bit x86.
+
+# The advanced day 7 map tool (tools/day07-map, which build.sh passes in as the
+# day07map build context), cross-compiled for 32-bit x86 in a stage that runs
+# on the build machine's own platform. Building it inside the emulated 386
+# image fails in CI: Go's resolver can't look up proxy.golang.org under QEMU
+# ("socket: function not implemented"), so the x/term download fails.
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.25-alpine AS day07map-build
+COPY --from=day07map . /src
+RUN cd /src \
+ && CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -trimpath -ldflags "-s -w" -o /out/day07-map .
+
 FROM docker.io/i386/alpine:3.24
 
 ENV KERNEL=virt
@@ -113,17 +124,12 @@ RUN for dir in /workspace/*/; do \
     for log in /tmp/warm.*.log; do echo "== $log"; cat "$log"; done; \
     rm /tmp/warm.*.log; exit $failed
 
-# The advanced day 7 map tool and its readme go in days/07/advanced, which the
-# page fills in around at startup. Built with the image's Go from
-# tools/day07-map, which build.sh passes in as the day07map build context.
-# No bundle-mark here: one now would also claim every file the warm-up above
-# wrote. These two files fall in the small "days" group instead.
-COPY --from=day07map . /tmp/day07-map
+# The advanced day 7 map tool (built in the day07map-build stage at the top)
+# and its readme go in days/07/advanced, which the page fills in around at
+# startup. No bundle-mark here: one now would also claim every file the warm-up
+# above wrote. These two files fall in the small "days" group instead.
+COPY --from=day07map-build /out/day07-map /workspace/days/07/advanced/day07-map
 COPY day07-advanced/README.md /workspace/days/07/advanced/README.md
-RUN cd /tmp/day07-map \
- && GOFLAGS= GOCACHE=/tmp/day07-cache GOMODCACHE=/tmp/day07-mod go build -trimpath -ldflags "-s -w" \
-      -o /workspace/days/07/advanced/day07-map . \
- && cd / && rm -rf /tmp/day07-map /tmp/day07-cache /tmp/day07-mod
 
 # Remove what the VM can never use, after the warm-up so it still builds:
 # - bundle-mark's working files
