@@ -1,11 +1,14 @@
 #!/bin/sh
 # Helper the web UI types into the terminal.
 #
-#   sb sync  [ROWS COLS]          apply saved files, set the clock and terminal size
-#   sb run   [ROWS COLS [FILE]]   same, then run FILE (or ./run.sh) and time it
-#   sb bench ROWS COLS FILE [N]   same, then run it N more times with no output
-#   sb exec  PROGRAM [ARGS]       mark where measuring starts, then run PROGRAM
-#   sb apply                      only apply saved files (sb-agent runs this)
+#   sb sync               apply saved files and set the clock
+#   sb run   [FILE]       same, then run FILE (or ./run.sh) and time it
+#   sb bench FILE [N]     same, then run it N more times with no output
+#   sb exec  PROGRAM ...  mark where measuring starts, then run PROGRAM
+#   sb apply              only apply saved files (sb-agent runs this)
+#
+# The terminals' sizes aren't passed in: sb-agent sets them whenever the page
+# resizes one.
 #
 # SB_CALIBRATE=1 makes run measure background work first, as bench always does.
 #
@@ -73,9 +76,8 @@ fi
 
 cmd=$1
 hwclock -s -u
-[ -n "$3" ] && stty rows "$2" cols "$3"
-file=$4
-runs=${5:-3}
+file=$2
+runs=${3:-3}
 
 apply
 
@@ -239,5 +241,5 @@ case "$cmd" in
     sync
     if [ "$status" = 0 ]; then summary "$runs runs, average"; else summary "exit $status"; fi
     ;;
-  *) echo "usage: sb sync|run|bench [ROWS COLS [FILE [N]]]" >&2; exit 2 ;;
+  *) echo "usage: sb sync|run|bench [FILE [N]]" >&2; exit 2 ;;
 esac

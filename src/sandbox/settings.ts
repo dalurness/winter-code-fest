@@ -14,7 +14,9 @@ export interface Settings {
   minimap: boolean;
   /** Show the whole VM filesystem in the explorer, not just /workspace and /tmp */
   showAllFiles: boolean;
+  /** The editor's */
   fontSize: number;
+  terminalFontSize: number;
   /** Measured runs after the first in a benchmark */
   benchRuns: number;
 }
@@ -44,6 +46,7 @@ const DEFAULTS: Settings = {
   minimap: false,
   showAllFiles: false,
   fontSize: 14,
+  terminalFontSize: 13,
   benchRuns: 3,
 };
 

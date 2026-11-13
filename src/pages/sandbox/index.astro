@@ -13,7 +13,7 @@ const SHORTCUTS = [
   ["Ctrl+S", "Save"],
   ["Ctrl+P", "Go to file"],
   ["Ctrl+`, Ctrl+J", "Show or hide the terminal"],
-  ["Ctrl+Shift+`", "Open a second terminal"],
+  ["Ctrl+Shift+`", "Open another terminal"],
   ["Ctrl+Shift+↑ / ↓", "Resize the terminal"],
   ["Ctrl+B", "Show or hide the explorer"],
   ["Ctrl+Shift+E", "Focus the explorer"],
@@ -224,9 +224,14 @@ const SHORTCUTS = [
               </select>
             </label>
             <label class="setting">
-              <strong>Font Size</strong>
+              <strong>Editor Font Size</strong>
               <span>The editor's font size, in pixels.</span>
               <input type="number" name="fontSize" min="8" max="32" />
+            </label>
+            <label class="setting">
+              <strong>Terminal Font Size</strong>
+              <span>The terminal's font size, in pixels.</span>
+              <input type="number" name="terminalFontSize" min="8" max="32" />
             </label>
             <label class="setting checkbox">
               <strong>Render Whitespace</strong>
@@ -307,7 +312,7 @@ const SHORTCUTS = [
                 id="split"
                 class="icon"
                 disabled
-                title="Open a second terminal (Ctrl+Shift+`)">+</button
+                title="Open another terminal (Ctrl+Shift+`)">+</button
               >
               <button
                 id="hide-panel"
@@ -316,9 +321,17 @@ const SHORTCUTS = [
               >
             </span>
           </div>
-          <div class="terminals">
-            <div id="term0" class="term"></div>
-            <div id="term1" class="term" hidden></div>
+          <div id="terminals" class="terminals">
+            <div id="term0" class="term">
+              <button class="icon term-close" title="Close this terminal"
+                >×</button
+              >
+            </div>
+            <div id="term1" class="term" hidden>
+              <button class="icon term-close" title="Close this terminal"
+                >×</button
+              >
+            </div>
           </div>
         </section>
       </section>

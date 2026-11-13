@@ -835,9 +835,29 @@ button.icon svg {
 }
 
 .term {
+  position: relative;
   flex: 1;
   min-width: 0;
   padding: 0 0 4px 14px;
+}
+
+/* With two terminals open, each can be closed on its own */
+.term-close {
+  display: none;
+  position: absolute;
+  top: 2px;
+  right: 14px;
+  z-index: 10;
+  background: var(--bg) !important;
+}
+
+.terminals.split .term:hover .term-close,
+.terminals.split .term:focus-within .term-close {
+  display: block;
+}
+
+.terminals.split .term-close:hover {
+  background: var(--hover-icon) !important;
 }
 
 .term + .term {

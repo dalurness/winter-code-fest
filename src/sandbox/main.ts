@@ -54,6 +54,7 @@ const ui = {
   empty: $("empty"),
   pages: $("pages"),
   split: $<HTMLButtonElement>("split"),
+  terminals: $("terminals"),
   hidePanel: $<HTMLButtonElement>("hide-panel"),
   status: $("status"),
   cursor: $("cursor"),
@@ -129,15 +130,11 @@ const terms = [
   new SerialTerminal(vm, 1, $("term1"), counter, setStatus),
 ] as const;
 let activeTerm: SerialTerminal = terms[0];
-terms.forEach((t) =>
-  t.element.addEventListener("focusin", () => (activeTerm = t))
-);
-
-/** `sb` sets the guest clock (for cargo mtimes) and the terminal size. */
-function sbArgs(term: SerialTerminal) {
-  const { rows, cols } = term.size;
-  return `${rows} ${cols}`;
-}
+terms.forEach((t) => {
+  t.element.addEventListener("focusin", () => (activeTerm = t));
+  // However it changes: the window, the sidebar, the panel or a second terminal
+  t.term.onResize(({ rows, cols }) => sync.resize(t.port, rows, cols));
+});
 
 /** Wait for a shell prompt on the terminal, then sync clock and size. */
 async function attachShell(term: SerialTerminal) {
@@ -148,8 +145,11 @@ async function attachShell(term: SerialTerminal) {
     // A restored snapshot is already sitting at a prompt; Enter reprints it
     if (snapshot) term.send("");
     await prompt;
+    // Again for a VM that just booted or was reset, which has its own idea
+    const { rows, cols } = term.size;
+    sync.resize(term.port, rows, cols);
     const synced = term.waitForPrompt();
-    term.send(`sb sync ${sbArgs(term)}; cd /workspace && clear`);
+    term.send("sb sync; cd /workspace && clear");
     await synced;
   } finally {
     term.element.style.visibility = "";
@@ -200,7 +200,10 @@ function applySettings() {
         .trim()
     );
   monaco.editor.setTheme(EDITOR_THEMES[theme]);
-  terms.forEach((t) => t.setTheme(TERMINAL_THEMES[theme]));
+  terms.forEach((t) => {
+    t.setTheme(TERMINAL_THEMES[theme]);
+    t.setFontSize(settings.terminalFontSize);
+  });
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
     wordWrap: wordWrap(),
@@ -211,7 +214,13 @@ function applySettings() {
   ui.autoSave.hidden = false;
 
   const form = ui.settings.elements;
-  for (const name of ["theme", "autoSave", "fontSize", "benchRuns"] as const) {
+  for (const name of [
+    "theme",
+    "autoSave",
+    "fontSize",
+    "terminalFontSize",
+    "benchRuns",
+  ] as const) {
     (form.namedItem(name) as HTMLInputElement).value = String(settings[name]);
   }
   for (const name of [
@@ -237,9 +246,9 @@ ui.settings.addEventListener("input", (event) => {
   const input = event.target as HTMLInputElement | HTMLSelectElement;
   if (input instanceof HTMLInputElement && input.type === "checkbox") {
     updateSettings({ [input.name]: input.checked });
-  } else if (input.name === "fontSize") {
+  } else if (input.name === "fontSize" || input.name === "terminalFontSize") {
     const size = Number(input.value);
-    if (size >= 8 && size <= 32) updateSettings({ fontSize: size });
+    if (size >= 8 && size <= 32) updateSettings({ [input.name]: size });
   } else if (input.name === "benchRuns") {
     const runs = Number(input.value);
     if (Number.isInteger(runs) && runs >= 1 && runs <= 20)
@@ -1838,9 +1847,9 @@ async function run({ bench = false } = {}) {
     const done = term.waitForPrompt();
     term.send(
       bench
-        ? `sb bench ${sbArgs(term)} ${shellQuote(path)} ${settings.benchRuns}`
+        ? `sb bench ${shellQuote(path)} ${settings.benchRuns}`
         : // The first run measures background work, for the count
-          `${counter.busyRate === undefined ? "SB_CALIBRATE=1 " : ""}sb run ${sbArgs(term)} ${shellQuote(path)}`
+          `${counter.busyRate === undefined ? "SB_CALIBRATE=1 " : ""}sb run ${shellQuote(path)}`
     );
     await done;
     // Resource timing entries can land a moment after the response finishes
@@ -1897,21 +1906,47 @@ async function reset() {
   setStatus("Reset to snapshot");
 }
 
-async function openSecondTerminal() {
-  if (!ready || !terms[1].element.hidden) return;
-  ui.split.disabled = true;
+/** Two terminals side by side can each be closed; one alone can only hide */
+function updateTerminals() {
+  const shown = terms.filter((t) => !t.element.hidden);
+  ui.split.disabled = !ready || shown.length === terms.length;
+  ui.terminals.classList.toggle("split", shown.length > 1);
+}
+
+async function openTerminal() {
+  const term = terms.find((t) => t.element.hidden);
+  if (!ready || !term) return;
   showPanel(true);
-  const term = terms[1];
+  // Drop what the fresh login printed while it was closed
+  term.reset();
   term.element.hidden = false;
+  updateTerminals();
   await attachShell(term);
   term.focus();
+}
+
+/** Closes one of two terminals, ending its shell like closing a terminal tab */
+function closeTerminal(term: SerialTerminal) {
+  const other = terms.find((t) => t !== term && !t.element.hidden);
+  if (!other || term.element.hidden) return;
+  term.element.hidden = true;
+  sync.hangUp(term.port);
+  term.reset();
+  activeTerm = other;
+  updateTerminals();
+  other.focus();
+}
+
+for (const term of terms) {
+  const close = term.element.querySelector<HTMLButtonElement>(".term-close")!;
+  close.onclick = () => closeTerminal(term);
 }
 
 ui.run.onclick = () => run();
 ui.bench.onclick = () => run({ bench: true });
 ui.refresh.onclick = refresh;
 ui.reset.onclick = reset;
-ui.split.onclick = openSecondTerminal;
+ui.split.onclick = openTerminal;
 ui.hidePanel.onclick = () => showPanel(false);
 
 // --- Keyboard shortcuts --------------------------------------------------
@@ -1949,7 +1984,7 @@ function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
     if (code === "KeyP" && !shift) return showQuickOpen;
     if ((code === "Backquote" || code === "KeyJ") && !shift)
       return () => showPanel();
-    if (code === "Backquote" && shift) return openSecondTerminal;
+    if (code === "Backquote" && shift) return openTerminal;
     if (code === "ArrowUp" && shift) return () => resizePanel(40);
     if (code === "ArrowDown" && shift) return () => resizePanel(-40);
     if (code === "KeyB" && !shift) return () => showSidebar();
@@ -2064,13 +2099,7 @@ if (Object.keys(work.saved.files).length)
 ui.empty.textContent =
   "Open a file from the explorer, or press Ctrl+P to find one.";
 
-for (const el of [
-  ui.refresh,
-  ui.reset,
-  ui.split,
-  ui.upload,
-  ui.newFile,
-  ui.newFolder,
-])
+updateTerminals();
+for (const el of [ui.refresh, ui.reset, ui.upload, ui.newFile, ui.newFolder])
   el.disabled = false;
 updateRunButton();
