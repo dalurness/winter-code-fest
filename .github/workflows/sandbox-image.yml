@@ -16,6 +16,10 @@ on:
       # A snapshot only restores into the v86 version that saved it
       - package-lock.json
       - .github/workflows/sandbox-image.yml
+      # Built into the image as days/07/advanced/day07-map
+      - tools/day07-map/**
+      - "!tools/day07-map/**/*.md"
+      - "!tools/day07-map/docs/**"
 
 permissions:
   contents: write

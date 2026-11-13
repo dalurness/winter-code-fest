@@ -25,7 +25,9 @@ for f in bios/seabios.bin bios/vgabios.bin; do
   [ -f "$OUT/$f" ] || curl -fsSL "$V86_RAW/$f" -o "$OUT/$f"
 done
 
-docker build . --platform linux/386 --rm --tag "$IMAGE_NAME"
+# tools/day07-map is outside this folder, so it is passed as a named context
+docker build . --platform linux/386 --rm --tag "$IMAGE_NAME" \
+  --build-context day07map=../../tools/day07-map
 docker rm "$CONTAINER_NAME" 2>/dev/null || true
 docker create --platform linux/386 -t -i --name "$CONTAINER_NAME" "$IMAGE_NAME"
 docker export "$CONTAINER_NAME" -o "$OUT_ROOTFS_TAR"
