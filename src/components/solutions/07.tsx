@@ -1,6 +1,7 @@
 import { AnswerChecker } from "../AnswerChecker";
 
 const OPTIMAL_DISTANCE = 68;
+const OPTIMAL_DISTANCE_BIG = 335;
 
 export default function () {
   return (
@@ -9,13 +10,27 @@ export default function () {
         {
           label: "Path",
           placeholder: "2N27E5S",
-          check: async (input) => (await pathDistance(input)) !== undefined,
+          check: async (input) =>
+            (await pathDistance("./map.txt", input)) !== undefined,
         },
         {
           label: "Challenge: Optimal path",
           placeholder: "2N27E5S",
           check: async (input) =>
-            (await pathDistance(input)) === OPTIMAL_DISTANCE,
+            (await pathDistance("./map.txt", input)) === OPTIMAL_DISTANCE,
+        },
+        {
+          label: "Bigger Challenge: Path on map-big.txt",
+          placeholder: "2N27E5S",
+          check: async (input) =>
+            (await pathDistance("./map-big.txt", input)) !== undefined,
+        },
+        {
+          label: "Bigger Challenge: Optimal path on map-big.txt",
+          placeholder: "2N27E5S",
+          check: async (input) =>
+            (await pathDistance("./map-big.txt", input)) ===
+            OPTIMAL_DISTANCE_BIG,
         },
       ]}
     />
@@ -26,13 +41,16 @@ export default function () {
  * Follow the path on the map and get the total distance traveled,
  * or undefined if it isn't a valid path from S to E
  */
-async function pathDistance(input: string): Promise<number | undefined> {
+async function pathDistance(
+  mapFile: string,
+  input: string
+): Promise<number | undefined> {
   const path = input.replace(/\s/g, "").toUpperCase();
   if (!/^(\d+[NSEW])+$/.test(path)) {
     return undefined;
   }
 
-  const map = (await (await fetch("./map.txt")).text())
+  const map = (await (await fetch(mapFile)).text())
     .split(/\r?\n/)
     .filter(Boolean);
 
