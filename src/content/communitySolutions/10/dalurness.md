@@ -2,6 +2,85 @@
 descriptions: ["zig", "go"]
 ---
 
+### 2026 Solution Go
+
+<details>
+<summary>Show Go Solution</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+	"bufio"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	file, err := os.Open("/workspace/days/10/trees.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	unbalanceTotal := 0
+	currentTotal := 0
+	left := 0
+	right := 0
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		switch len(line) {
+			case 1:
+				currentTotal += ToNum(line[0])
+			case 3:
+				left += ToNum(line[0])
+				right += ToNum(line[2])
+			case 7:
+				line = strings.ReplaceAll(line, "_", "0")
+				left += ToNum(line[0]) + ToNum(line[2])
+				right += ToNum(line[4]) + ToNum(line[6])
+
+				if Abs(right - left) > 1 {
+					unbalanceTotal += currentTotal + right + left
+				}
+				currentTotal = 0
+				right = 0
+				left = 0
+			default:
+				continue
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(unbalanceTotal)
+}
+
+func ToNum(b byte) int {
+	num, err := strconv.Atoi(string(b))
+	if err != nil {
+		log.Fatalf("failed to parse value: %s\n", string(b))
+	}
+	return num
+}
+
+func Abs(a int) int {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+```
+
 ### 2025 Solution Zig
 
 <details>
