@@ -74,7 +74,9 @@ RUN setup-hostname sandbox
 # https://wiki.alpinelinux.org/wiki/Alpine_Linux_in_a_chroot#Preparing_init_services
 RUN for i in devfs dmesg mdev hwdrivers; do rc-update add $i sysinit; done
 # No bootmisc: it only creates X11/ICE dirs in /tmp and log files nobody reads
-RUN for i in hwclock modules sysctl hostname; do rc-update add $i boot; done
+# loopback brings up lo, so a program can serve on 127.0.0.1 and reach it from
+# another (there is still no network card, so only from inside the VM)
+RUN for i in hwclock modules sysctl hostname loopback; do rc-update add $i boot; done
 RUN rc-update add killprocs shutdown
 
 # Generate initramfs with 9p modules

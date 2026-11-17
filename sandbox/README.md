@@ -1,6 +1,6 @@
 # WCF Sandbox
 
-The site's `/sandbox/` page boots a small 32-bit Alpine Linux in [v86](https://github.com/copy/v86), with a VS Code-style editor (Monaco), xterm.js terminals and a starter project for each language used in the Winter Code Fest community solutions. Everything runs in the browser; the VM has no network.
+The site's `/sandbox/` page boots a small 32-bit Alpine Linux in [v86](https://github.com/copy/v86), with a VS Code-style editor (Monaco), xterm.js terminals and a starter project for each language used in the Winter Code Fest community solutions. Everything runs in the browser; the VM has no network. It does have loopback, so a program can serve on `localhost` (IPv4 only, `127.0.0.1`) and be reached from another one in the VM, but not from the browser.
 
 The page is [src/pages/sandbox/index.astro](../src/pages/sandbox/index.astro) with its code in [src/sandbox](../src/sandbox). This folder builds the VM image and snapshot it boots from.
 

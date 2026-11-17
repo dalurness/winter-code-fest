@@ -41,6 +41,17 @@ tar -f "$OUT_ROOTFS_TAR" --delete .bundles
 # https://github.com/iximiuz/docker-to-linux/issues/19#issuecomment-1242809707
 tar -f "$OUT_ROOTFS_TAR" --delete ".dockerenv" || true
 
+# Docker mounts its own /etc/hosts and /etc/hostname over the image's, so the
+# export has them empty: localhost would not resolve and setup-hostname's name
+# would be lost. Put real ones in their place. localhost is IPv4 only: with
+# ::1 listed too, busybox wget tries ::1 first and gets refused by servers that
+# listen on 0.0.0.0 (Python's http.server does)
+rm -rf "$CACHE"/etc-fix && mkdir -p "$CACHE"/etc-fix/etc
+echo sandbox > "$CACHE"/etc-fix/etc/hostname
+printf '%s\n' '127.0.0.1	localhost sandbox' '::1	ip6-localhost' > "$CACHE"/etc-fix/etc/hosts
+tar -f "$OUT_ROOTFS_TAR" --delete etc/hosts etc/hostname
+tar -rf "$OUT_ROOTFS_TAR" -C "$CACHE"/etc-fix --owner=0 --group=0 --mode=644 etc/hosts etc/hostname
+
 # Files are named by content hash and existing ones are skipped, so old files
 # stay valid for pages that are still open and rebuilds only compress what
 # changed. ZSTD_LEVEL=9 builds much faster for slightly bigger downloads.
