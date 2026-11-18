@@ -25,7 +25,7 @@ RUN mkdir /.bundles
 # The apk cache mount keeps downloaded packages out of the image but reused
 # across builds, so changing the package list does not re-download everything
 RUN --mount=type=cache,target=/etc/apk/cache apk add openrc alpine-base agetty alpine-conf linux-$KERNEL linux-firmware-none \
-      tmux bash sqlite zstd \
+      tmux bash sqlite zstd curl \
  && bundle-mark base
 RUN --mount=type=cache,target=/etc/apk/cache apk add build-base && bundle-mark c
 RUN --mount=type=cache,target=/etc/apk/cache apk add nodejs-current && bundle-mark node
