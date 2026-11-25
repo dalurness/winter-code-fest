@@ -1,5 +1,5 @@
 import { marked } from "marked";
-import { normalize } from "./files";
+import { normalize } from "./paths";
 
 /**
  * Renders a Markdown file into `element`. Relative links (a question's input

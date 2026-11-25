@@ -8,6 +8,21 @@ export type ContentFile =
 
 export const DAYS_DIR = "/workspace/days";
 
+/** The site's pages, from its /sandbox/pages.json */
+export interface SitePages {
+  days: { id: string; title: string; solutions: string[] }[];
+}
+
+let sitePages: Promise<SitePages> | undefined;
+
+/** Fetched once, the first time a page tab shows its breadcrumbs */
+export function fetchSitePages(): Promise<SitePages> {
+  sitePages ??= fetch(`${import.meta.env.BASE_URL}sandbox/pages.json`)
+    .then((res) => (res.ok ? (res.json() as Promise<SitePages>) : { days: [] }))
+    .catch(() => ({ days: [] }));
+  return sitePages;
+}
+
 export async function fetchContent(): Promise<ContentFile[]> {
   const res = await fetch(`${import.meta.env.BASE_URL}sandbox/content.json`);
   return res.ok ? res.json() : [];

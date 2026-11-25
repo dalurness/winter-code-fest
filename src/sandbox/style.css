@@ -531,13 +531,6 @@ button.icon svg {
   }
 }
 
-/* The terminal's scrollbar stays visible instead of fading out, like the
-   editor's */
-.xterm .xterm-scrollable-element > .scrollbar.invisible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* --- Tabs --- */
 
 .tabs-bar {
@@ -701,7 +694,8 @@ button.icon svg {
   color: var(--muted);
 }
 
-.breadcrumbs.address-bar {
+/* A page tab's breadcrumbs (see renderPageCrumbs in main.ts) */
+.breadcrumbs.page-crumbs {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -709,14 +703,48 @@ button.icon svg {
   padding: 0 8px;
 }
 
-.address-bar input {
-  flex: 1;
+.page-crumbs .icon {
+  flex: none;
+}
+
+.page-crumbs .sep {
+  flex: none;
+  margin: 0 1px;
+}
+
+.page-crumbs .icon + .page-crumb {
+  margin-left: 6px;
+}
+
+button.page-crumb {
   min-width: 0;
-  margin-left: 4px;
-  padding: 1px 10px;
-  border-radius: 12px;
-  background: var(--bg);
-  color: var(--text);
+  padding: 1px 6px;
+  background: none;
+  border-color: transparent;
+  font: inherit;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* The page's own part takes the room the others don't need */
+.page-crumb[aria-current="page"] {
+  flex: 0 1 auto;
+  color: var(--strong);
+}
+
+button.page-crumb:hover,
+button.page-crumb:focus-visible {
+  background: var(--selected);
+  color: var(--strong);
+}
+
+.page-crumb.more {
+  flex: none;
+  padding: 2px 6px;
 }
 
 .breadcrumbs .sep {
@@ -839,6 +867,9 @@ button.icon svg {
   flex: 1;
   min-width: 0;
   padding: 0 0 4px 14px;
+  /* ghostty-web makes it contenteditable to get pastes and IME input, so the
+     browser drew its own text caret in the corner, beside the terminal's */
+  caret-color: transparent;
 }
 
 /* With two terminals open, each can be closed on its own */
@@ -864,9 +895,8 @@ button.icon svg {
   border-left: 1px solid var(--border);
 }
 
-.term,
-.term .xterm-viewport {
-  background: var(--bg) !important;
+.term {
+  background: var(--bg);
 }
 
 .workbench.sidebar-hidden {
@@ -1022,6 +1052,8 @@ button.icon svg {
   position: fixed;
   z-index: 20;
   min-width: 180px;
+  max-height: min(420px, calc(100vh - 16px));
+  overflow-y: auto;
   padding: 4px;
   background: var(--overlay);
   border: 1px solid var(--border);
@@ -1040,6 +1072,16 @@ button.icon svg {
   background: var(--accent);
   color: #fff;
   outline: none;
+}
+
+/* The page a breadcrumb's menu is on */
+.context-menu li[aria-current="page"] {
+  font-weight: 600;
+}
+
+.context-menu li[aria-current="page"]::before {
+  content: "•";
+  margin: 0 6px 0 -12px;
 }
 
 .context-menu li[role="separator"] {

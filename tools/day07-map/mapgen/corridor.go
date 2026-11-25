@@ -5,14 +5,14 @@ import "math"
 // The corridor network guarantees that the map is connected where it
 // matters. The plane is cut into CorridorCell x CorridorCell cells. Each cell
 // has one node at a seed-chosen spot near its middle. Nodes are joined to
-// their neighbours by meandering valleys of air, and the network is connected
+// their neighbors by meandering valleys of air, and the network is connected
 // by construction, so any corridor tile can reach any other corridor tile.
 //
 // Corridors are a pure function of the seed, like everything else. They are
 // carved after all other terrain, so nothing can block them. The start and
 // the goal are both corridor nodes, which is what makes every seed solvable.
 //
-// Looks: a corridor is meant to pass for a natural valley. Its centre line is
+// Looks: a corridor is meant to pass for a natural valley. Its center line is
 // a sum of six octaves of 1D gradient noise, from one or two big bends per
 // cell down to bends every hundred tiles and a wobble every dozen. Its width, floor depth and how
 // steeply the walls rise all vary along it. Only a core band is guaranteed
@@ -31,15 +31,15 @@ import "math"
 //     own face.
 //   - Connectivity of each link. An east link is the band of tiles (x, y)
 //     with |y - c(x)| <= w(x) * sqrt(1 + min(c'(x), 8)^2), where c is the
-//     centre line and w >= corridorMinHalfWidth is the perpendicular
+//     center line and w >= corridorMinHalfWidth is the perpendicular
 //     half-width (south links swap x and y). Each column holds at least 3
-//     tiles. Adjacent columns overlap when the centre line moves less than
+//     tiles. Adjacent columns overlap when the center line moves less than
 //     2W-1 between them, where W is that vertical half-width: with |c'| <= 8
 //     that holds because W >= 1.6*max(1, |c'|), and beyond 8 because
 //     W >= 12.9 while the octave amplitudes bound |c'| below 20.
 //   - The band starts and ends on the two nodes, and a disc of radius
 //     corridorNodeRadius around each node joins the ends of its links.
-//   - Nodes sit in the middle half of their cell and the centre line strays
+//   - Nodes sit in the middle half of their cell and the center line strays
 //     at most corridorMaxOffset from the straight line between its nodes, so
 //     a link and its sloped walls never leave the two cells it joins. A tile
 //     therefore only has to look at the four links of its own cell.
@@ -98,7 +98,7 @@ func LinkDropped(seed uint64, i, j int64, horizontal bool) bool {
 	return faceDrop(seed, i, j) == 3 || faceDrop(seed, i-1, j) == 4
 }
 
-// The centre line's sideways offset is a sum of these octaves. Big ones fade
+// The center line's sideways offset is a sum of these octaves. Big ones fade
 // in and out with sin(pi t) so the line meets both nodes; small ones fade
 // over the first and last 40 tiles. The amplitudes sum to under
 // corridorMaxOffset.
@@ -177,16 +177,16 @@ func (e *edge) smooth01(channel uint64, lu, wavelength float64) float64 {
 	return 0.5 + 0.5*n
 }
 
-// centre returns the centre line's v (relative to node A) and slope dv/du at
+// center returns the center line's v (relative to node A) and slope dv/du at
 // lu tiles along the main axis from node A.
-func (e *edge) centre(lu float64) (float64, float64) {
-	c, s, _ := e.centreNear(lu, 0, math.Inf(1))
+func (e *edge) center(lu float64) (float64, float64) {
+	c, s, _ := e.centerNear(lu, 0, math.Inf(1))
 	return c, s
 }
 
-// centreNear is centre, but it gives up (ok false) as soon as the remaining
-// octaves can no longer bring the centre line within margin of lv.
-func (e *edge) centreNear(lu, lv, margin float64) (c, s float64, ok bool) {
+// centerNear is center, but it gives up (ok false) as soon as the remaining
+// octaves can no longer bring the center line within margin of lv.
+func (e *edge) centerNear(lu, lv, margin float64) (c, s float64, ok bool) {
 	t := lu / e.length
 	c, s = e.dv*t, e.dv/e.length
 	env := math.Sin(math.Pi * t)
@@ -232,7 +232,7 @@ func (e *edge) measure(x, y int64, reach float64) (span, bool) {
 		return span{}, false
 	}
 	lv := float64(v - e.av)
-	c, s, ok := e.centreNear(lu, lv, (corridorMaxHalfWidth+reach)*corridorMaxStretch)
+	c, s, ok := e.centerNear(lu, lv, (corridorMaxHalfWidth+reach)*corridorMaxStretch)
 	if !ok {
 		return span{}, false
 	}
@@ -312,7 +312,7 @@ func carveCorridors(seed uint64, x, y int64, h, rough float64) float64 {
 	return h
 }
 
-// EachCorridorLine calls fn at points every step tiles along the centre line
+// EachCorridorLine calls fn at points every step tiles along the center line
 // of every link that may pass through the box [x0, x1) x [y0, y1). It is for
 // drawing the network when zoomed out, where testing tiles would miss it.
 func EachCorridorLine(seed uint64, x0, y0, x1, y1 int64, step float64, fn func(x, y int64)) {
@@ -329,7 +329,7 @@ func EachCorridorLine(seed uint64, x0, y0, x1, y1 int64, step float64, fn func(x
 				}
 				e := newEdge(seed, i, j, h)
 				for lu := 0.0; lu <= e.length; lu += step {
-					c, _ := e.centre(lu)
+					c, _ := e.center(lu)
 					fn(e.xy(e.au+int64(math.Round(lu)), e.av+int64(math.Round(c))))
 				}
 			}

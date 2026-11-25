@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -14,11 +15,57 @@ import (
 	"wcf/day07-map/mapgen"
 )
 
+// sgr writes color escapes for a run of cells, sending each color only
+// when it differs from the cell before. Repeating the same truecolor codes
+// for every cell made frames about three times bigger, which costs the VM
+// time to format and the terminal time to parse.
+type sgr struct {
+	b            []byte
+	fg, bg       rgb
+	hasFg, hasBg bool
+}
+
+func (s *sgr) set(fg rgb, bg *rgb) {
+	setFg := !s.hasFg || fg != s.fg
+	setBg := bg != nil && (!s.hasBg || *bg != s.bg)
+	if !setFg && !setBg {
+		return
+	}
+	s.b = append(s.b, "\x1b["...)
+	if setFg {
+		s.b = appendColor(append(s.b, "38;2;"...), fg)
+		s.fg, s.hasFg = fg, true
+	}
+	if setBg {
+		if setFg {
+			s.b = append(s.b, ';')
+		}
+		s.b = appendColor(append(s.b, "48;2;"...), *bg)
+		s.bg, s.hasBg = *bg, true
+	}
+	s.b = append(s.b, 'm')
+}
+
+// endLine resets the colors, so the rest of the line keeps the terminal's
+// background, and moves to the next line.
+func (s *sgr) endLine() {
+	s.b = append(s.b, "\x1b[0m\r\n"...)
+	s.hasFg, s.hasBg = false, false
+}
+
+func appendColor(b []byte, c rgb) []byte {
+	b = strconv.AppendUint(b, uint64(c.r), 10)
+	b = append(b, ';')
+	b = strconv.AppendUint(b, uint64(c.g), 10)
+	b = append(b, ';')
+	return strconv.AppendUint(b, uint64(c.b), 10)
+}
+
 // halfBlocks renders a view whose height is two pixels per text row using
 // "▀" with a truecolor foreground (top pixel) and background (bottom pixel),
-// in palette pal. With cross set, the centre pixel is drawn as a crosshair.
+// in palette pal. With cross set, the center pixel is drawn as a crosshair.
 func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) string {
-	var b strings.Builder
+	s := sgr{b: make([]byte, 0, v.w*v.h*4)}
 	col := func(i, j int) rgb {
 		if m, ok := marks[[2]int{i, j}]; ok {
 			return m.c
@@ -30,26 +77,27 @@ func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) 
 		for i := 0; i < v.w; i++ {
 			t, u := col(i, j), col(i, j+1)
 			if cross && i == cx && (j == cy || j+1 == cy) {
-				// Keep the other pixel's colour as the background.
+				// Keep the other pixel's color as the background.
 				bg := u
 				if j+1 == cy {
 					bg = t
 				}
-				fg := textOn(bg)
-				fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm+", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b)
+				s.set(textOn(bg), &bg)
+				s.b = append(s.b, '+')
 				continue
 			}
-			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm▀", t.r, t.g, t.b, u.r, u.g, u.b)
+			s.set(t, &u)
+			s.b = append(s.b, "▀"...)
 		}
-		b.WriteString("\x1b[0m\r\n")
+		s.endLine()
 	}
-	return b.String()
+	return string(s.b)
 }
 
 // oxFrame renders one O (air) or X (mountain) per pixel on the terminal's
-// own background, each character coloured by palette pal.
+// own background, each character colored by palette pal.
 func oxFrame(v view, hs [][]int, marks map[[2]int]mark, pal int) string {
-	var b strings.Builder
+	s := sgr{b: make([]byte, 0, v.w*v.h*2)}
 	for j, row := range hs {
 		for i, ht := range row {
 			ch, c := oxChar(ht), oxText(tileColor(ht, pal))
@@ -59,23 +107,27 @@ func oxFrame(v view, hs [][]int, marks map[[2]int]mark, pal int) string {
 			if i == v.w/2 && j == v.h/2 {
 				ch, c = '+', rgb{255, 220, 0}
 			}
-			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm%c", c.r, c.g, c.b, ch)
+			s.set(c, nil)
+			s.b = append(s.b, ch)
 		}
-		b.WriteString("\x1b[0m\r\n")
+		s.endLine()
 	}
-	return b.String()
+	return string(s.b)
 }
 
 type viewer struct {
 	seedStr string
 	seed    uint64
-	x, y    int64 // centre tile
+	x, y    int64 // center tile
 	zoom    int64
 	fast    bool
 	ox      bool // O/X characters instead of half blocks
 	pal     int
 	help    bool
 	ov      overlay
+	// The last frame's view and heights, reused by the next draw
+	last   view
+	lastHs [][]int
 }
 
 func runView(args []string) {
@@ -254,7 +306,8 @@ func (v *viewer) draw() {
 	vw := view{seed: v.seed, zoom: v.zoom, w: w, h: h,
 		x0: v.x - int64(w/2)*v.zoom, y0: v.y - int64(h/2)*v.zoom}
 	t := time.Now()
-	hs := vw.heights()
+	hs := vw.heightsReusing(v.last, v.lastHs)
+	v.last, v.lastHs = vw, hs
 	marks := v.ov.marks(vw)
 	var frame string
 	if v.ox {

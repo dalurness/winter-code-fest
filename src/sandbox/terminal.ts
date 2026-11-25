@@ -1,6 +1,6 @@
-import { Terminal, type ITheme } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import type { Emulator, InstructionCounter } from "./vm";
+import { FitAddon, init, Terminal, type ITheme } from "ghostty-web";
+import type { CounterView, VmClient } from "./vm-client";
+import type { SerialItem } from "./vm-protocol";
 
 /** Matches the shell prompt set in the image's .profile, e.g. "/workspace/go $ " */
 const PROMPT = /\/\S* [#$] $/;
@@ -13,13 +13,17 @@ const ESCAPES = /\x1b\[[0-9;?]*[A-Za-z]/g;
  * count goes in its summary line. Runs between "baseline" and "measure" are of
  * a program that only exits, whose count is subtracted from the others. The
  * two runs between "calibrate N" and "measure" are N instructions apart, and
- * the rest of their difference is background work. Markers are read here, as
- * the serial port sends them, so the count stops at the instruction that
- * printed the marker.
+ * the rest of their difference is background work. The worker running the VM
+ * splits markers out as the serial port sends them, with the count at the
+ * instruction that printed each (see vm-worker.ts).
  */
-const MARKER = "\x1b]7771;";
 
 const encoder = new TextEncoder();
+
+// The terminals are ghostty-web: Ghostty's terminal in WebAssembly, drawn on
+// a canvas, with an API copied from xterm.js. Its wasm is inlined in its
+// module, so this needs no extra request.
+await init();
 
 const MAX_PASTE_BYTES = 1e6;
 
@@ -63,11 +67,7 @@ export const TERMINAL_THEMES: Record<"wcf" | "dark", ITheme> = {
     cursor: "#333333",
     cursorAccent: "#f6f9ff",
     selectionBackground: "#b9d1ff",
-    // Same as --scrollbar in style.css
-    scrollbarSliderBackground: "#5d7dba40",
-    scrollbarSliderHoverBackground: "#5d7dba66",
-    scrollbarSliderActiveBackground: "#5d7dba99",
-    // Darker than xterm's defaults so colored output reads on a light background
+    // Darker than the usual defaults so colored output reads on a light background
     black: "#333333",
     red: "#c0303f",
     green: "#2b7a3b",
@@ -85,9 +85,6 @@ export const TERMINAL_THEMES: Record<"wcf" | "dark", ITheme> = {
     cursor: "#c4cfdf",
     cursorAccent: "#0d121b",
     selectionBackground: "#2a4170",
-    scrollbarSliderBackground: "#4d6ba844",
-    scrollbarSliderHoverBackground: "#4d6ba866",
-    scrollbarSliderActiveBackground: "#4d6ba899",
     black: "#1c2636",
     red: "#f08090",
     green: "#8fd4a0",
@@ -101,6 +98,59 @@ export const TERMINAL_THEMES: Record<"wcf" | "dark", ITheme> = {
   },
 };
 
+/** The theme colors ghostty-web's wasm terminal gives cells */
+const CELL_COLORS = [
+  "foreground",
+  "background",
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite",
+] as const satisfies (keyof ITheme)[];
+
+/** "#rrggbb" as a number, as the renderer gets it in three parts */
+const rgbOf = (color: string | undefined) =>
+  color?.match(/^#[0-9a-f]{6}$/i) ? parseInt(color.slice(1), 16) : undefined;
+
+/** The parts of ghostty-web's Terminal that this reaches past its API for */
+interface GhosttyInternals {
+  wasmTerm: { getCursor(): { y: number } };
+  renderer: {
+    setTheme(theme: ITheme): void;
+    rgbToCSS(r: number, g: number, b: number): string;
+    render(
+      buffer: unknown,
+      forceAll: boolean,
+      viewportY: number,
+      scrollback: unknown,
+      scrollbarOpacity?: number
+    ): void;
+    cursorVisible: boolean;
+    hoveredHyperlinkId: number;
+    hoveredLinkRange: unknown;
+    selectionManager?: { getDirtySelectionRows(): Set<number> };
+  };
+  viewportY: number;
+  scrollbarOpacity: number;
+  lastCursorY: number;
+  cursorMoveEmitter: { fire(): void };
+  isOpen: boolean;
+  isDisposed: boolean;
+  startRenderLoop(): void;
+}
+
 /** One measured run: v86's instruction count and the real time it took */
 interface Sample {
   instructions: number;
@@ -110,24 +160,23 @@ interface Sample {
 const median = (values: number[]) =>
   values.toSorted((a, b) => a - b)[Math.floor(values.length / 2)];
 
-/** An xterm.js terminal attached to one of the VM's serial ports. */
+/** A terminal attached to one of the VM's serial ports. */
 export class SerialTerminal {
-  readonly term = new Terminal({
-    fontFamily: "ui-monospace, Menlo, Consolas, monospace",
-    cursorBlink: true,
-    scrollback: 5000,
-  });
-  private fit = new FitAddon();
-  private pending: number[] = [];
-  private flushTimer: ReturnType<typeof setTimeout> | undefined;
+  readonly term: Terminal;
+  private fit: FitAddon;
   private tail = "";
+  /** The colors it opened with, which its wasm terminal keeps */
+  private firstTheme: ITheme;
+  private theme: ITheme;
+  /** The first theme's colors, as numbers, to the current theme's (see setTheme) */
+  private colors = new Map<number, string>();
   private promptWaiters: (() => void)[] = [];
-  /** Bytes that may be the start of a marker */
-  private marker = "";
   private runStart = { count: 0, at: 0 };
   /** Where runs go: the measured program, or one of the estimates' */
   private phase: "runs" | "baseline" | "calibrate" = "runs";
   private calibrationInstructions = 0;
+  /** Whether the canvas is behind what it shows (see renderWhenNeeded) */
+  private stale = true;
   private samples: Record<typeof this.phase, Sample[]> = {
     runs: [],
     baseline: [],
@@ -135,56 +184,128 @@ export class SerialTerminal {
   };
 
   constructor(
-    private vm: Emulator,
+    private vm: VmClient,
     readonly port: 0 | 1,
     readonly element: HTMLElement,
-    private counter: InstructionCounter,
-    status: (text: string) => void
+    private counter: CounterView,
+    private status: (text: string) => void,
+    initial: { theme: ITheme; fontSize: number }
   ) {
+    this.firstTheme = this.theme = initial.theme;
+    const options = {
+      fontFamily: "ui-monospace, Menlo, Consolas, monospace",
+      cursorBlink: true,
+      scrollback: 5000,
+      ...initial,
+    };
+    this.term = new Terminal(options);
+    this.fit = new FitAddon();
     this.term.loadAddon(this.fit);
+    this.renderWhenNeeded();
     this.term.open(element);
-    // OSC 52 copies to the clipboard: ESC ] 52 ; c ; BASE64 BEL. With "?"
-    // instead of the text it asks for the clipboard, and the answer is typed
-    // back in the same form. The image's wl-copy, xclip, xsel and pbcopy and
-    // their paste versions use it, and so can tmux and Neovim.
-    this.term.parser.registerOscHandler(52, (data) => {
-      const base64 = data.slice(data.indexOf(";") + 1);
-      if (base64 === "?") {
-        void this.pasteToGuest(status);
-        return true;
-      }
-      try {
-        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-        copyFromGuest(new TextDecoder().decode(bytes), status);
-      } catch {
-        // Not base64; ignored like any unknown sequence
-      }
-      return true;
-    });
+    const renderer = (this.term as unknown as GhosttyInternals).renderer;
+    const css = renderer.rgbToCSS.bind(renderer);
+    renderer.rgbToCSS = (r, g, b) =>
+      this.colors.get((r << 16) | (g << 8) | b) ?? css(r, g, b);
     // Ctrl+Shift+C and Ctrl+Shift+V copy and paste, as in VS Code's and
-    // Linux terminals, where Ctrl+C and Ctrl+V go to the program
+    // Linux terminals, where Ctrl+C and Ctrl+V go to the program. Unlike
+    // xterm.js's, ghostty-web's handler returns whether it took the key, and
+    // then also stops the browser's default for it.
     this.term.attachCustomKeyEventHandler((event) => {
       if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey)
-        return true;
-      if (event.code === "KeyC") {
-        // Also keeps Chrome from opening its element inspector
-        event.preventDefault();
-        if (event.type === "keydown" && this.term.hasSelection())
-          void navigator.clipboard.writeText(this.term.getSelection());
+        return false;
+      if (event.code !== "KeyC") {
+        // Paste is left to the browser, which pastes into the terminal's
+        // input, so it needs no clipboard permission
         return false;
       }
-      // Left to the browser, which pastes into xterm's textarea, so this
-      // needs no clipboard permission
-      return event.code !== "KeyV";
+      // Taking Ctrl+Shift+C also keeps Chrome from opening its inspector
+      if (this.term.hasSelection())
+        void navigator.clipboard.writeText(this.term.getSelection());
+      return true;
     });
-    this.term.onData((data) => {
-      counter.activity();
-      vm.serial_send_bytes(port, encoder.encode(data));
-    });
-    vm.add_listener(`serial${port}-output-byte`, (byte) => this.receive(byte));
-    new ResizeObserver(() => !element.hidden && this.fit.fit()).observe(
-      element
-    );
+    this.term.onData((data) => vm.send(port, encoder.encode(data)));
+    vm.onSerial(port, (items) => this.receive(items));
+    new ResizeObserver(() => {
+      this.stale = true;
+      if (!element.hidden) this.fit.fit();
+    }).observe(element);
+  }
+
+  /**
+   * ghostty-web redraws every animation frame, even with nothing new: with
+   * two terminals that took over half the main thread, which the editor and
+   * the browser tab share. This replaces its loop (before `open` starts it)
+   * with one that only draws when something changed: output, a resize, the
+   * cursor blinking, scrolling, the mouse or keys (selections and links), or
+   * focus. A hidden terminal waits until it shows again.
+   */
+  private renderWhenNeeded() {
+    const term = this.term as unknown as GhosttyInternals;
+    const stale = () => (this.stale = true);
+    for (const type of [
+      "mousedown",
+      "mousemove",
+      "mouseleave",
+      "wheel",
+      "keydown",
+      "focusin",
+      "focusout",
+    ])
+      this.element.addEventListener(type, stale, {
+        capture: true,
+        passive: true,
+      });
+    document.addEventListener("mouseup", stale, { passive: true });
+    const write = this.term.write.bind(this.term);
+    this.term.write = (...args: Parameters<Terminal["write"]>) => {
+      this.stale = true;
+      write(...args);
+    };
+    let last = {
+      viewportY: 0,
+      opacity: 0,
+      cursor: true,
+      link: 0,
+      range: null as unknown,
+    };
+    term.startRenderLoop = () => {
+      const frame = () => {
+        if (term.isDisposed || !term.isOpen) return;
+        requestAnimationFrame(frame);
+        if (this.element.hidden || !this.element.offsetParent) return;
+        const r = term.renderer;
+        const now = {
+          viewportY: term.viewportY,
+          opacity: term.scrollbarOpacity,
+          cursor: r.cursorVisible,
+          link: r.hoveredHyperlinkId,
+          range: r.hoveredLinkRange,
+        };
+        const changed =
+          this.stale ||
+          (Object.keys(now) as (keyof typeof now)[]).some(
+            (key) => now[key] !== last[key]
+          ) ||
+          !!r.selectionManager?.getDirtySelectionRows().size;
+        if (!changed) return;
+        this.stale = false;
+        last = now;
+        r.render(
+          term.wasmTerm,
+          false,
+          term.viewportY,
+          term,
+          term.scrollbarOpacity
+        );
+        const { y } = term.wasmTerm.getCursor();
+        if (y !== term.lastCursorY) {
+          term.lastCursorY = y;
+          term.cursorMoveEmitter.fire();
+        }
+      };
+      frame();
+    };
   }
 
   /**
@@ -217,20 +338,64 @@ export class SerialTerminal {
     }
     let binary = "";
     for (const byte of bytes) binary += String.fromCharCode(byte);
-    this.vm.serial_send_bytes(
-      this.port,
-      encoder.encode(`\x1b]52;c;${btoa(binary)}\x07`)
-    );
+    this.vm.send(this.port, encoder.encode(`\x1b]52;c;${btoa(binary)}\x07`));
   }
 
+  /**
+   * OSC 52 copies to the clipboard: ESC ] 52 ; c ; BASE64 BEL. With "?"
+   * instead of the text it asks for the clipboard, and the answer is typed
+   * back in the same form. The image's wl-copy, xclip, xsel and pbcopy and
+   * their paste versions use it, and so can tmux and Neovim. The worker
+   * splits it out of the output (see vm-worker.ts).
+   */
+  private onClipboard(data: string) {
+    const base64 = data.slice(data.indexOf(";") + 1);
+    if (base64 === "?") {
+      void this.pasteToGuest(this.status);
+      return;
+    }
+    try {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      copyFromGuest(new TextDecoder().decode(bytes), this.status);
+    } catch {
+      // Not base64; ignored like any unknown sequence
+    }
+  }
+
+  /**
+   * ghostty-web only takes colors when it opens, and warns that changing
+   * `options.theme` later isn't supported: its wasm terminal works out each
+   * cell's color, and ignores the escape sequences that change them (OSC 4,
+   * 10 and 11). So the canvas renderer, which turns those colors into CSS,
+   * swaps the first theme's for the current one's, and gets the rest of the
+   * theme, like the selection's color. A program's own color that happens to
+   * match one of the first theme's changes too.
+   */
   setTheme(theme: ITheme) {
-    this.term.options.theme = theme;
+    if (this.theme === theme) return;
+    this.theme = theme;
+    this.colors.clear();
+    for (const key of CELL_COLORS) {
+      const from = rgbOf(this.firstTheme[key]);
+      const to = theme[key];
+      if (from !== undefined && to && to !== this.firstTheme[key])
+        this.colors.set(from, to);
+    }
+    const internals = this.term as unknown as GhosttyInternals;
+    internals.renderer.setTheme(theme);
+    internals.renderer.render(
+      internals.wasmTerm,
+      true,
+      internals.viewportY,
+      internals
+    );
   }
 
   /** Refits right away, since the element keeps its size and its observer stays quiet */
   setFontSize(size: number) {
     if (this.term.options.fontSize === size) return;
     this.term.options.fontSize = size;
+    this.stale = true;
     if (!this.element.hidden) this.fit.fit();
   }
 
@@ -240,7 +405,7 @@ export class SerialTerminal {
 
   /** Type a line into the shell. */
   send(line: string) {
-    this.vm.serial_send_bytes(this.port, encoder.encode(line + "\r"));
+    this.vm.send(this.port, encoder.encode(line + "\r"));
   }
 
   /** Resolves the next time the shell prints its prompt. */
@@ -253,38 +418,43 @@ export class SerialTerminal {
   }
 
   reset() {
-    this.pending = [];
     this.tail = "";
-    this.marker = "";
     this.phase = "runs";
     this.samples = { runs: [], baseline: [], calibrate: [] };
     this.term.reset();
+    this.stale = true;
   }
 
-  private receive(byte: number) {
-    this.counter.activity();
-    if (this.marker || byte === 0x1b) {
-      this.marker += String.fromCharCode(byte);
-      if (MARKER.startsWith(this.marker)) return;
-      if (this.marker.startsWith(MARKER)) {
-        if (byte === 0x07) {
-          this.onMarker(this.marker.slice(MARKER.length, -1));
-          this.marker = "";
-          return;
-        }
-        if (this.marker.length < 32) return;
+  private receive(items: SerialItem[]) {
+    const parts: Uint8Array[] = [];
+    for (const item of items) {
+      if (item.kind === "data") parts.push(item.bytes);
+      else if (item.kind === "clipboard") this.onClipboard(item.data);
+      else {
+        const text = this.onMarker(item);
+        if (text) parts.push(encoder.encode(text));
       }
-      // Some other escape sequence
-      for (const c of this.marker) this.pending.push(c.charCodeAt(0));
-      this.marker = "";
-    } else {
-      this.pending.push(byte);
     }
-    // Bytes arrive one at a time; batch them so xterm renders once per frame
-    this.flushTimer ??= setTimeout(() => this.flush(), 16);
+    // The worker sends a frame's output at a time, so it renders once
+    for (const bytes of parts) {
+      this.term.write(bytes);
+      this.tail = (
+        this.tail + String.fromCharCode(...bytes.subarray(-256))
+      ).slice(-256);
+    }
+    if (PROMPT.test(this.tail.replace(ESCAPES, ""))) {
+      const waiters = this.promptWaiters;
+      this.promptWaiters = [];
+      waiters.forEach((resolve) => resolve());
+    }
   }
 
-  private onMarker(marker: string) {
+  /** Returns text to show in its place */
+  private onMarker({
+    marker,
+    count,
+    at,
+  }: Extract<SerialItem, { kind: "marker" }>): string | undefined {
     const [name, arg] = marker.split(" ");
     if (name === "reset") {
       this.samples.runs = [];
@@ -297,15 +467,16 @@ export class SerialTerminal {
       this.phase = "runs";
     } else if (name === "start") {
       // A project's run.sh marks again once it has built
-      this.runStart = { count: this.counter.read(), at: performance.now() };
+      this.runStart = { count, at };
     } else if (name === "end") {
       this.samples[this.phase].push({
-        instructions: this.counter.read() - this.runStart.count,
-        ms: performance.now() - this.runStart.at,
+        instructions: count - this.runStart.count,
+        ms: at - this.runStart.at,
       });
     } else if (name === "report") {
-      this.pending.push(...encoder.encode(this.describeRuns()));
+      return this.describeRuns();
     }
+    return undefined;
   }
 
   private calibrate() {
@@ -337,21 +508,5 @@ export class SerialTerminal {
     if (counts.length === 1)
       return `, ≈${compact.format(counts[0]!)} instructions`;
     return `, median ≈${compact.format(median(counts)!)} instructions (${compact.format(counts[0]!)}–${compact.format(counts.at(-1)!)})`;
-  }
-
-  private flush() {
-    this.flushTimer = undefined;
-    const bytes = new Uint8Array(this.pending);
-    this.pending = [];
-    this.term.write(bytes);
-
-    this.tail = (
-      this.tail + String.fromCharCode(...bytes.subarray(-256))
-    ).slice(-256);
-    if (PROMPT.test(this.tail.replace(ESCAPES, ""))) {
-      const waiters = this.promptWaiters;
-      this.promptWaiters = [];
-      waiters.forEach((resolve) => resolve());
-    }
   }
 }

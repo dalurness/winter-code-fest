@@ -68,6 +68,8 @@ export default defineConfig({
   trailingSlash: "always",
   vite: {
     plugins: [tailwindcss(), sandboxFiles()],
+    // The sandbox's VM worker (src/sandbox/vm-worker.ts) imports modules
+    worker: { format: "es" },
   },
   markdown: {
     // Code blocks sit on the same light blue as the sandbox's Markdown preview.

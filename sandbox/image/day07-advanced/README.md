@@ -11,7 +11,7 @@ Buddy's map from day 7 was small enough to read into memory. This one isn't: it 
 - Moves are **north, east, south and west** only. Two air tiles that touch only at a corner are not connected. North is `-y`.
 - The goal is between 262,144 and 524,288 tiles from the start, so you'll explore something like 10^11 tiles if you search naively. You'll need something smarter, such as searching in chunks and keeping only summaries of them.
 - Every seed has a route. The map is generated so that a winding network of valleys always connects the start to the goal, though there are usually much shorter routes.
-- Want it extra hard? Don't ask where the goal is. Explore until you find it, checking the tiles you reach with `isgoal` (honour system).
+- Want it extra hard? Don't ask where the goal is. Explore until you find it, checking the tiles you reach with `isgoal` (honor system).
 
 Your answer is the route, and shorter is better. Pick any seed you like: a number or any string, such as your name.
 
@@ -25,7 +25,7 @@ Your answer is the route, and shorter is better. Pick any seed you like: a numbe
 ./advanced/day07-map chunk -x 4600 -y 2190 -w 40 -h 10 -seed north-pole   # print tiles as O/X
 ```
 
-The viewer pans with the arrow keys or WASD, zooms with `+` and `-`, jumps to the start with `o` and the goal with `g`, and quits with `q`. `m` switches between coloured blocks and O/X letters, `p` changes the palette, `c` highlights the guaranteed valleys, and `?` shows every key. It's slow inside this browser VM, so stay near zoom 1:1. The fastest way to explore is on your own computer, by building it from `tools/day07-map` in the Winter Code Fest repository.
+The viewer pans with the arrow keys or WASD, zooms with `+` and `-`, jumps to the start with `o` and the goal with `g`, and quits with `q`. `m` switches between colored blocks and O/X letters, `p` changes the palette, `c` highlights the guaranteed valleys, and `?` shows every key. It's slow inside this browser VM, so stay near zoom 1:1. The fastest way to explore is on your own computer, by building it from `tools/day07-map` in the Winter Code Fest repository.
 
 ## Using it from a solution
 

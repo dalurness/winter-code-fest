@@ -1,7 +1,13 @@
 import { badge } from "./badges";
-import { addContent, DAYS_DIR, fetchContent } from "./content";
+import {
+  DAYS_DIR,
+  fetchContent,
+  fetchSitePages,
+  type SitePages,
+} from "./content";
 import { EDITOR_THEMES, monaco } from "./editor";
-import { FileService, normalize, type Entry } from "./files";
+import type { TreeEntry } from "./files";
+import { normalize } from "./paths";
 import { renderMarkdown } from "./preview";
 import { languageOf } from "./languages";
 import {
@@ -15,12 +21,7 @@ import {
 import { GuestSync, type GuestChanges } from "./sync";
 import { SerialTerminal, TERMINAL_THEMES } from "./terminal";
 import { contextOf, WorkCache } from "./work-cache";
-import {
-  createVm,
-  fetchBundles,
-  fetchSnapshot,
-  InstructionCounter,
-} from "./vm";
+import { FilesClient, VmClient } from "./vm-client";
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -108,27 +109,32 @@ work.onFull = () =>
 const started = performance.now();
 setStatus("Downloading snapshot…");
 const contentPromise = fetchContent();
-const bundlesPromise = fetchBundles();
-const snapshot = params.has("fresh") ? undefined : await fetchSnapshot();
-metrics.snapshot = !!snapshot;
+// The VM runs in a worker, so drawing the page never slows it down
+const vm = new VmClient(params.has("fresh"));
+vm.onBytes = (bytes) => (metrics.bytes += bytes);
+const snapshot = await vm.snapshot;
+metrics.snapshot = snapshot;
 setStatus(
   snapshot
     ? "Restoring snapshot…"
     : "Booting (no snapshot, this takes a while)…"
 );
 
-const bundles = await bundlesPromise;
-const vm = createVm(snapshot, bundles);
-// Handy for poking at the emulator from devtools while developing
-if (import.meta.env.DEV) Object.assign(window, { vm });
-const files = new FileService(vm);
-const sync = new GuestSync(vm, onGuestChange);
+const files = new FilesClient(vm);
+const sync = new GuestSync(vm, (changes) => void onGuestChange(changes));
 files.onStaged = (path) => sync.saved(path);
-const counter = new InstructionCounter(vm);
+const counter = vm.counter;
+const terminalSettings = () => ({
+  theme: TERMINAL_THEMES[resolveTheme(settings.theme)],
+  fontSize: settings.terminalFontSize,
+});
 const terms = [
-  new SerialTerminal(vm, 0, $("term0"), counter, setStatus),
-  new SerialTerminal(vm, 1, $("term1"), counter, setStatus),
+  new SerialTerminal(vm, 0, $("term0"), counter, setStatus, terminalSettings()),
+  new SerialTerminal(vm, 1, $("term1"), counter, setStatus, terminalSettings()),
 ] as const;
+// Handy for poking at the VM and terminals from devtools while developing;
+// the emulator itself is `vm` in the worker's console
+if (import.meta.env.DEV) Object.assign(window, { vm, terms });
 let activeTerm: SerialTerminal = terms[0];
 terms.forEach((t) => {
   t.element.addEventListener("focusin", () => (activeTerm = t));
@@ -200,9 +206,10 @@ function applySettings() {
         .trim()
     );
   monaco.editor.setTheme(EDITOR_THEMES[theme]);
+  const { theme: terminalTheme, fontSize } = terminalSettings();
   terms.forEach((t) => {
-    t.setTheme(TERMINAL_THEMES[theme]);
-    t.setFontSize(settings.terminalFontSize);
+    t.setTheme(terminalTheme);
+    t.setFontSize(fontSize);
   });
   editor.updateOptions({
     renderWhitespace: settings.renderWhitespace ? "all" : "selection",
@@ -333,7 +340,7 @@ const MAX_OPEN_BYTES = 5e6;
 let loadingDisk = false;
 
 async function loadFile(path: string): Promise<OpenFile | undefined> {
-  const size = files.size(path);
+  const size = await files.size(path);
   if (size > MAX_OPEN_BYTES) {
     setStatus(`${baseName(path)} is ${mb(size)}, too big to open`);
     return;
@@ -378,7 +385,7 @@ async function loadFile(path: string): Promise<OpenFile | undefined> {
 async function openFile(path: string, { focus = true } = {}) {
   // The language's files start downloading before the first run needs them
   const language = languageOf(path);
-  if (language) bundles?.prefetchLanguage(language.id);
+  if (language) void vm.call("prefetchLanguage", language.id);
   if (!open.has(path)) {
     const file = await loadFile(path);
     if (!file) return;
@@ -523,10 +530,13 @@ function onPageClick(event: MouseEvent, page: OpenPage) {
     .slice(SITE.length)
     .match(/^day\/(\d+)\/([^/]+\.[^/]+)$/);
   const path = input && `${DAYS_DIR}/${input[1]}/${input[2]}`;
-  if (path && files.exists(path)) void openFile(path);
-  else if (event.ctrlKey || event.metaKey || event.button === 1)
-    openPage(url.pathname + url.search + url.hash, { newTab: true });
-  else navigatePage(page, url);
+  const newTab = event.ctrlKey || event.metaKey || event.button === 1;
+  void (async () => {
+    if (path && (await files.exists(path))) void openFile(path);
+    else if (newTab)
+      openPage(url.pathname + url.search + url.hash, { newTab: true });
+    else navigatePage(page, url);
+  })();
 }
 
 // Switches to a tab already showing the site, or opens one on the home page
@@ -547,7 +557,7 @@ function openSettings() {
  */
 async function openFromParams(params: URLSearchParams): Promise<boolean> {
   const day = params.get("day")?.padStart(2, "0");
-  if (!day || !files.exists(`${DAYS_DIR}/${day}`)) return false;
+  if (!day || !(await files.exists(`${DAYS_DIR}/${day}`))) return false;
   const solution = params.get("solution");
   if (!solution) {
     openPage(`${SITE}day/${day}/`);
@@ -555,8 +565,8 @@ async function openFromParams(params: URLSearchParams): Promise<boolean> {
   }
   openPage(`${SITE}day/${day}/solution/${solution}/`);
   const dir = `${DAYS_DIR}/${day}/solutions/${solution}`;
-  const code = files.exists(dir)
-    ? files.list(dir).find((e) => e.name.startsWith("solution"))
+  const code = (await files.exists(dir))
+    ? (await files.list(dir)).find((e) => e.name.startsWith("solution"))
     : undefined;
   if (code) await openFile(code.path);
   return true;
@@ -794,49 +804,174 @@ ui.tabs.addEventListener(
   { passive: false }
 );
 
-/** Back, forward, reload and the address, in place of a page tab's breadcrumbs */
-function renderAddressBar(page: OpenPage) {
-  const button = (text: string, title: string, onclick: () => void) => {
+/** One part of a page tab's breadcrumbs */
+interface Crumb {
+  label: string;
+  url: string;
+  /** The other pages at its level, for its menu */
+  siblings?: { label: string; url: string }[] | undefined;
+}
+
+/**
+ * Where a page is in the site, as breadcrumbs: Winter Code Fest › Chillenge 9:
+ * Title › someone's solution. A chillenge without its title yet (before
+ * pages.json arrives) shows its number.
+ */
+function pageCrumbs(page: OpenPage, pages: SitePages | undefined): Crumb[] {
+  const path = new URL(page.url, location.origin).pathname.slice(SITE.length);
+  const crumbs: Crumb[] = [{ label: "Winter Code Fest", url: SITE }];
+  const days = pages?.days ?? [];
+  const dayLabel = (id: string) => {
+    const title = days.find((d) => d.id === id)?.title;
+    return `Chillenge ${Number(id)}${title ? `: ${title}` : ""}`;
+  };
+  const dayUrl = (id: string) => `${SITE}day/${id}/`;
+  const match = path.match(/^day\/(\d+)\/(?:solution\/([^/]+)\/)?$/);
+  if (!match) {
+    if (path) crumbs.push({ label: page.title, url: page.url });
+    return crumbs;
+  }
+  const [, id, user] = match as [string, string, string | undefined];
+  crumbs.push({
+    label: dayLabel(id),
+    url: dayUrl(id),
+    siblings: days.map((d) => ({ label: dayLabel(d.id), url: dayUrl(d.id) })),
+  });
+  if (user) {
+    const solutionUrl = (name: string) => `${dayUrl(id)}solution/${name}/`;
+    crumbs.push({
+      label: `${user}'s solution`,
+      url: solutionUrl(user),
+      siblings: days
+        .find((d) => d.id === id)
+        ?.solutions.map((name) => ({
+          label: `${name}'s solution`,
+          url: solutionUrl(name),
+        })),
+    });
+  }
+  return crumbs;
+}
+
+/** The pages one level below a page, for the "›" after its last crumb */
+function pageChildren(crumbs: Crumb[], pages: SitePages | undefined) {
+  const last = crumbs.at(-1)!;
+  const days = pages?.days ?? [];
+  if (crumbs.length === 1)
+    return days.map((d) => ({
+      label: `Chillenge ${Number(d.id)}: ${d.title}`,
+      url: `${SITE}day/${d.id}/`,
+    }));
+  const day = days.find((d) => `${SITE}day/${d.id}/` === last.url);
+  return (day?.solutions ?? []).map((name) => ({
+    label: `${name}'s solution`,
+    url: `${last.url}solution/${name}/`,
+  }));
+}
+
+/** The menu a breadcrumb button opened, so a second click closes it */
+let crumbMenuOwner: HTMLElement | undefined;
+
+/**
+ * A page tab's breadcrumbs, like documentation's: each part goes to its
+ * page, or lists the pages beside it, and a "›" after the last lists the
+ * pages under it. Back and forward stay, as the tab keeps its own history.
+ */
+function renderPageCrumbs(page: OpenPage, pages: SitePages | undefined) {
+  const bar = ui.breadcrumbs;
+  bar.classList.add("page-crumbs");
+  const go = (url: string) => {
+    if (navigatePage(page, new URL(url, location.origin))) page.frame.focus();
+  };
+  const icon = (
+    text: string,
+    title: string,
+    enabled: boolean,
+    step: number
+  ) => {
     const b = document.createElement("button");
     b.className = "icon";
     b.textContent = text;
     b.title = title;
-    b.onclick = onclick;
+    b.disabled = !enabled;
+    b.onclick = () => navigatePage(page, step);
     return b;
   };
-  const back = button("←", "Back", () => navigatePage(page, -1));
-  back.disabled = page.index === 0;
-  const forward = button("→", "Forward", () => navigatePage(page, 1));
-  forward.disabled = page.index === page.history.length - 1;
-  const reload = button("⟳", "Reload", () =>
-    page.frame.contentWindow?.location.reload()
+  bar.append(
+    icon("←", "Back", page.index > 0, -1),
+    icon("→", "Forward", page.index < page.history.length - 1, 1)
   );
-
-  const address = document.createElement("input");
-  address.type = "text";
-  address.value = page.url;
-  address.spellcheck = false;
-  address.setAttribute("aria-label", "Address");
-  address.onfocus = () => address.select();
-  address.onkeydown = (event) => {
-    if (event.key === "Escape") address.value = page.url;
-    if (event.key !== "Enter") return;
-    // Relative addresses, like "day/03", are within the site
-    const url = new URL(address.value.trim(), location.origin + SITE);
-    if (navigatePage(page, url)) page.frame.focus();
-    else address.value = page.url;
+  const current = page.url.split("#")[0];
+  const menuButton = (
+    button: HTMLButtonElement,
+    items: () => { label: string; url: string }[]
+  ) => {
+    let wasOpen = false;
+    button.setAttribute("aria-haspopup", "menu");
+    button.onpointerdown = () => {
+      wasOpen = !ui.contextMenu.hidden && crumbMenuOwner === button;
+    };
+    button.onclick = () => {
+      if (wasOpen) {
+        hideMenu();
+        return;
+      }
+      const list = items();
+      if (!list.length) return;
+      const { left, bottom } = button.getBoundingClientRect();
+      crumbMenuOwner = button;
+      showMenu(
+        list.map(({ label, url }) => [label, () => go(url), url === current]),
+        { clientX: left, clientY: bottom + 2 },
+        { focus: true }
+      );
+    };
   };
-
-  ui.breadcrumbs.classList.add("address-bar");
-  ui.breadcrumbs.append(back, forward, reload, address);
+  const crumbs = pageCrumbs(page, pages);
+  crumbs.forEach((crumb, i) => {
+    if (i > 0) {
+      const sep = document.createElement("span");
+      sep.className = "sep";
+      sep.textContent = "›";
+      bar.append(sep);
+    }
+    const b = document.createElement("button");
+    b.className = "page-crumb";
+    b.textContent = crumb.label;
+    b.title = crumb.label;
+    if (i === crumbs.length - 1) b.setAttribute("aria-current", "page");
+    if (crumb.siblings?.length) menuButton(b, () => crumb.siblings!);
+    else b.onclick = () => go(crumb.url);
+    bar.append(b);
+  });
+  const children = pageChildren(crumbs, pages);
+  if (children.length) {
+    const more = document.createElement("button");
+    more.className = "page-crumb more";
+    more.textContent = "›";
+    more.title =
+      crumbs.length === 1
+        ? "Chillenges"
+        : "Community solutions for this chillenge";
+    menuButton(more, () => children);
+    bar.append(more);
+  }
 }
 
 function renderBreadcrumbs() {
   ui.breadcrumbs.replaceChildren();
-  ui.breadcrumbs.classList.remove("address-bar");
+  ui.breadcrumbs.classList.remove("page-crumbs");
   const tab = active && open.get(active);
   if (!tab) return;
-  if (isPage(tab)) return renderAddressBar(tab);
+  if (isPage(tab)) {
+    void fetchSitePages().then((pages) => {
+      // Still showing the same page
+      if (open.get(active!) !== tab) return;
+      ui.breadcrumbs.replaceChildren();
+      renderPageCrumbs(tab, pages);
+    });
+    return renderPageCrumbs(tab, undefined);
+  }
   (isFile(tab) ? active! : "Settings")
     .split("/")
     .filter(Boolean)
@@ -909,7 +1044,7 @@ window.addEventListener("blur", () => {
  * keeps them and asks which version to keep instead.
  */
 async function reload(path: string, file: OpenFile) {
-  if (!files.exists(path)) return;
+  if (!(await files.exists(path))) return;
   const text = await files.read(path);
   if (text === file.disk) return;
   file.disk = text;
@@ -983,18 +1118,20 @@ async function refresh() {
 }
 
 /** Picks up what programs in the VM changed, as GuestSync reports it */
-function onGuestChange({ written, replaced, dirs }: GuestChanges) {
+async function onGuestChange({ written, replaced, dirs }: GuestChanges) {
   for (const [path, file] of open) {
     // The guest has an older copy until sb-agent applies the save
     if (!isFile(file) || sync.isApplying(path)) continue;
-    const { id, parentid } = files.locate(path);
+    const { id, parentid } = await files.locate(path);
     if (written.has(id) || replaced.has(`${parentid}/${baseName(path)}`))
       void reload(path, file);
   }
   if (!dirs.size) return;
   const shown = new Set(
-    [...expanded, ...sections().map((s) => s.path)].map(
-      (dir) => files.locate(dir).id
+    await Promise.all(
+      [...expanded, ...sections().map((s) => s.path)].map(
+        async (dir) => (await files.locate(dir)).id
+      )
     )
   );
   // Not while a new file's name is being typed in it; that redraws it after
@@ -1020,9 +1157,10 @@ function updatePreview({ focus = true } = {}) {
   ui.editor.hidden = !file || show;
   if (show) {
     renderMarkdown(ui.preview, file.model.getValue(), active!, (path) => {
-      const target = files.resolveFile(path);
-      if (target) void openFile(target);
-      else setStatus(`${path} not found`);
+      void files.resolveFile(path).then((target) => {
+        if (target) void openFile(target);
+        else setStatus(`${path} not found`);
+      });
     });
   } else if (file && focus) {
     editor.focus();
@@ -1040,9 +1178,14 @@ ui.previewToggle.onclick = () => togglePreview();
 
 // --- Tab context menu ----------------------------------------------------
 
-type MenuItem = [label: string, action: () => void] | "separator";
+type MenuAction = [label: string, action: () => void, current?: boolean];
+type MenuItem = MenuAction | "separator";
 
-function showMenu(items: MenuItem[], event: MouseEvent) {
+function showMenu(
+  items: MenuItem[],
+  event: Pick<MouseEvent, "clientX" | "clientY">,
+  { focus = false } = {}
+) {
   ui.contextMenu.replaceChildren(
     ...items.map((item) => {
       const li = document.createElement("li");
@@ -1050,10 +1193,11 @@ function showMenu(items: MenuItem[], event: MouseEvent) {
         li.role = "separator";
         return li;
       }
-      const [label, action] = item;
+      const [label, action, current] = item;
       li.role = "menuitem";
       li.tabIndex = -1;
       li.textContent = label;
+      if (current) li.setAttribute("aria-current", "page");
       li.onclick = () => {
         hideMenu();
         action();
@@ -1062,6 +1206,12 @@ function showMenu(items: MenuItem[], event: MouseEvent) {
     })
   );
   ui.contextMenu.hidden = false;
+  if (focus) {
+    const items = [...ui.contextMenu.querySelectorAll("li[role=menuitem]")];
+    const current = items.find((li) => li.hasAttribute("aria-current"));
+    ((current ?? items[0]) as HTMLElement | undefined)?.focus();
+    current?.scrollIntoView({ block: "nearest" });
+  }
   // Keep the menu on screen
   const { width, height } = ui.contextMenu.getBoundingClientRect();
   ui.contextMenu.style.left = `${Math.min(event.clientX, innerWidth - width - 4)}px`;
@@ -1069,6 +1219,27 @@ function showMenu(items: MenuItem[], event: MouseEvent) {
 }
 
 const hideMenu = () => (ui.contextMenu.hidden = true);
+
+// Arrow keys move through the menu and Enter picks
+ui.contextMenu.addEventListener("keydown", (event) => {
+  const items = [
+    ...ui.contextMenu.querySelectorAll<HTMLElement>("li[role=menuitem]"),
+  ];
+  const at = items.indexOf(document.activeElement as HTMLElement);
+  const move = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+  if (move) {
+    event.preventDefault();
+    items[(at + move + items.length) % items.length]?.focus();
+  } else if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    items.at(event.key === "Home" ? 0 : -1)?.focus();
+  } else if ((event.key === "Enter" || event.key === " ") && at >= 0) {
+    event.preventDefault();
+    items[at]!.click();
+  }
+});
+// A click in a page tab's frame doesn't reach this document
+window.addEventListener("blur", hideMenu);
 
 const copyItems = (path: string): MenuItem[] => [
   ["Copy Name", () => void navigator.clipboard.writeText(baseName(path))],
@@ -1179,7 +1350,7 @@ const CHEVRON =
 /** The folder just opened or closed, whose arrow turns as the tree redraws */
 let toggled: string | undefined;
 
-function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
+function row(entry: TreeEntry, depth: number, isOpen?: boolean): HTMLElement {
   const row = document.createElement("div");
   row.className = "row";
   row.tabIndex = -1;
@@ -1208,8 +1379,9 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
       uploadDir = entry.path;
       if (!expanded.delete(entry.path)) expanded.add(entry.path);
       toggled = entry.path;
-      renderTree();
-      toggled = undefined;
+      void renderTree().finally(() => {
+        if (toggled === entry.path) toggled = undefined;
+      });
     };
   } else {
     if (entry.kind === "link") {
@@ -1219,7 +1391,7 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
       target.textContent = `→ ${entry.target}`;
       row.append(target);
     }
-    const path = files.resolveFile(entry.path) ?? entry.path;
+    const path = entry.file ?? entry.path;
     row.classList.toggle("active", path === active);
     fileRows.set(path, [...(fileRows.get(path) ?? []), row]);
     markDirtyInTree(path);
@@ -1231,12 +1403,17 @@ function row(entry: Entry, depth: number, isOpen?: boolean): HTMLElement {
   return row;
 }
 
+/** The folders the explorer shows, as the last redraw read them */
+let treeDirs: Record<string, TreeEntry[]> = {};
+/** Counts redraws, so an older one that finishes late is dropped */
+let treeVersion = 0;
+
 function renderDir(dir: string, depth: number): HTMLElement {
   const ul = document.createElement("ul");
   ul.role = "group";
   // Indent guide under the parent folder's twistie
   ul.style.setProperty("--guide", `${4 + (depth - 1) * 8 + 8}px`);
-  for (const entry of files.list(dir)) {
+  for (const entry of treeDirs[dir] ?? []) {
     const li = document.createElement("li");
     const isOpen = entry.kind === "dir" ? expanded.has(entry.path) : undefined;
     li.append(row(entry, depth, isOpen));
@@ -1246,7 +1423,15 @@ function renderDir(dir: string, depth: number): HTMLElement {
   return ul;
 }
 
-function renderTree() {
+/** Reads the explorer's folders from the VM and redraws it */
+async function renderTree() {
+  const version = ++treeVersion;
+  const dirs = await files.tree(
+    sections().map((s) => s.path),
+    [...expanded]
+  );
+  if (version !== treeVersion) return;
+  treeDirs = dirs;
   fileRows.clear();
   const focused = (document.activeElement as HTMLElement | null)?.title;
   const ul = document.createElement("ul");
@@ -1320,19 +1505,22 @@ ui.collapse.onclick = () => {
 // --- New files and folders ----------------------------------------------
 
 /** Why a new entry can't be called `name` in `dir`, if it can't */
-function newEntryError(dir: string, name: string): string | undefined {
+async function newEntryError(
+  dir: string,
+  name: string
+): Promise<string | undefined> {
   if (name.startsWith("/")) return "A name can't start with /";
   const path = normalize(`${dir}/${name}`);
   if (!path.startsWith(`${dir === "/" ? "" : dir}/`))
     return `That would be outside ${dir}`;
-  if (files.exists(path)) return `${baseName(path)} already exists here`;
+  if (await files.exists(path)) return `${baseName(path)} already exists here`;
   for (
     let i = path.indexOf("/", dir.length + 1);
     i > 0;
     i = path.indexOf("/", i + 1)
   ) {
     const parent = path.slice(0, i);
-    if (files.exists(parent) && !files.isDir(parent))
+    if ((await files.exists(parent)) && !(await files.isDir(parent)))
       return `${baseName(parent)} is a file`;
   }
   return;
@@ -1343,16 +1531,16 @@ function newEntryError(dir: string, name: string): string | undefined {
  * Enter makes it, Escape cancels, and a name with slashes makes the folders
  * in it too.
  */
-function newEntry(kind: "file" | "dir", dir = uploadDir) {
+async function newEntry(kind: "file" | "dir", dir = uploadDir) {
   if (!ready) {
     setStatus("Wait for the VM to start before adding files");
     return;
   }
-  if (!files.isDir(dir)) dir = "/workspace";
+  if (!(await files.isDir(dir))) dir = "/workspace";
   showSidebar(true);
   reveal(`${dir}/`);
   expanded.add(dir);
-  renderTree();
+  await renderTree();
 
   const parent = ui.tree.querySelector<HTMLElement>(
     `.row[data-dir="${CSS.escape(dir)}"]`
@@ -1383,8 +1571,12 @@ function newEntry(kind: "file" | "dir", dir = uploadDir) {
   group.prepend(li);
   input.focus();
 
-  const check = () => {
-    const error = input.value && newEntryError(dir, input.value);
+  /** Counts checks, so one that answers after a newer one is dropped */
+  let checks = 0;
+  const check = async () => {
+    const check = ++checks;
+    const error = input.value && (await newEntryError(dir, input.value));
+    if (check !== checks) return false;
     message.textContent = error || "";
     message.hidden = !error;
     entryRow.classList.toggle("invalid", !!error);
@@ -1395,30 +1587,30 @@ function newEntry(kind: "file" | "dir", dir = uploadDir) {
     if (done) return;
     done = true;
     const name = input.value.trim();
-    if (!create || !name || !check()) {
-      renderTree();
+    if (!create || !name || !(await check())) {
+      void renderTree();
       return;
     }
     const path = normalize(`${dir}/${name}`);
     // A trailing slash makes a folder, as in VS Code
     if (kind === "dir" || name.endsWith("/")) {
-      files.mkdir(path);
+      await files.mkdir(path);
       expanded.add(path);
       uploadDir = path;
       reveal(`${path}/`);
-      renderTree();
+      void renderTree();
       setStatus(`Made ${path}`);
     } else {
       await files.write(path, "");
       uploadDir = dirName(path);
       reveal(path);
-      renderTree();
+      void renderTree();
       await openFile(path);
     }
   };
 
   input.oninput = () => {
-    check();
+    void check();
     if (icon) {
       const next = badge(baseName(input.value) || "");
       icon.replaceWith(next);
@@ -1428,7 +1620,9 @@ function newEntry(kind: "file" | "dir", dir = uploadDir) {
   input.onkeydown = (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      if (check()) void finish(true);
+      void check().then((ok) => {
+        if (ok) void finish(true);
+      });
     } else if (event.key === "Escape") {
       event.preventDefault();
       void finish(false);
@@ -1517,7 +1711,8 @@ async function upload(uploads: Upload[], dir: string): Promise<string[]> {
   }
   const prefix = dir === "/" ? "" : dir;
   const targets = uploads.map((u) => ({ ...u, path: `${prefix}/${u.path}` }));
-  const existing = targets.filter((t) => files.exists(t.path));
+  const found = await Promise.all(targets.map((t) => files.exists(t.path)));
+  const existing = targets.filter((_, i) => found[i]);
   if (
     existing.length &&
     !confirm(
@@ -1637,23 +1832,12 @@ let quickOpenFiles: string[] = [];
 let quickOpenSelected = 0;
 
 /** Every file under the explorer's roots, skipping build caches. */
-function listAllFiles(): string[] {
-  const SKIP = /^(node_modules|target|build|\.zig-cache|_build|\.git)$/;
-  const result: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of files.list(dir)) {
-      if (result.length > 20000) return;
-      if (entry.kind === "dir") {
-        if (!SKIP.test(entry.name)) walk(entry.path);
-      } else {
-        result.push(entry.path);
-      }
-    }
-  };
-  for (const { path } of sections()) {
-    if (path !== "/") walk(path);
-  }
-  return result;
+function listAllFiles(): Promise<string[]> {
+  return files.listAll(
+    sections()
+      .map((s) => s.path)
+      .filter((path) => path !== "/")
+  );
 }
 
 /** Lower is better, or undefined if `query`'s letters are not all in order in `path`. */
@@ -1711,12 +1895,17 @@ function renderQuickOpen() {
 }
 
 function showQuickOpen() {
-  quickOpenFiles = listAllFiles();
   quickOpenSelected = 0;
   ui.quickOpenInput.value = "";
   ui.quickOpen.hidden = false;
   renderQuickOpen();
   ui.quickOpenInput.focus();
+  // Open tabs show until the list arrives, and anything typed meanwhile
+  // filters it then
+  void listAllFiles().then((paths) => {
+    quickOpenFiles = paths;
+    if (!ui.quickOpen.hidden) renderQuickOpen();
+  });
 }
 
 function hideQuickOpen() {
@@ -1892,15 +2081,14 @@ async function reset() {
   // The snapshot's files replace the edits, after a reload too
   work.clearFiles();
   activate(undefined);
-  await vm.restore_state(snapshot);
-  counter.resync();
-  addContent(files, await contentPromise);
+  await vm.call("reset");
+  await vm.call("addContent", await contentPromise);
   terms.forEach((t) => t.reset());
   await Promise.all(
     terms.filter((t) => !t.element.hidden).map((t) => attachShell(t))
   );
   for (const path of reopen) {
-    if (files.exists(path)) await openFile(path, { focus: false });
+    if (await files.exists(path)) await openFile(path, { focus: false });
   }
   if (current && open.has(current)) activate(current);
   setStatus("Reset to snapshot");
@@ -1967,7 +2155,7 @@ function cycleTab(step: number) {
  * too, as in VS Code.
  */
 const inTerminal = (event: Event) =>
-  event.target instanceof Element && !!event.target.closest(".xterm");
+  event.target instanceof Element && !!event.target.closest(".term");
 
 function shortcut(event: KeyboardEvent): (() => unknown) | undefined {
   const ctrl = event.ctrlKey || event.metaKey;
@@ -2040,12 +2228,12 @@ window.addEventListener("pagehide", () => work.flush());
 async function restoreWork(): Promise<boolean> {
   const { files: saved, open: tabs, active: last } = work.saved;
   for (const [path, text] of Object.entries(saved)) {
-    if (files.isDir(path)) continue;
+    if (await files.isDir(path)) continue;
     await files.write(path, text);
   }
   let opened = false;
   for (const path of tabs) {
-    if (files.exists(path) && !files.isDir(path)) {
+    if ((await files.exists(path)) && !(await files.isDir(path))) {
       await openFile(path, { focus: false });
       opened = true;
     }
@@ -2056,25 +2244,21 @@ async function restoreWork(): Promise<boolean> {
 
 // --- Start ---------------------------------------------------------------
 
-vm.add_listener("download-progress", (e) => {
+vm.onDownloadProgress = (e) => {
   if (e.lengthComputable && e.total > 1e6) {
     setStatus(
-      `Downloading ${e.file_name.split("/").pop()}: ${mb(e.loaded)} / ${mb(e.total)}`
+      `Downloading ${e.fileName.split("/").pop()}: ${mb(e.loaded)} / ${mb(e.total)}`
     );
   }
-});
+};
 
 renderTabs();
 updatePreview({ focus: false });
 updateRunButton();
 
-// emulator-ready fires before the snapshot is restored, emulator-loaded after
-await new Promise<void>((resolve) =>
-  vm.add_listener("emulator-loaded", () => resolve())
-);
-counter.resync();
+await vm.loaded;
 // Before the shell starts, so the days exist before anything looks them up
-addContent(files, await contentPromise);
+await vm.call("addContent", await contentPromise);
 await attachShell(terms[0]);
 ready = true;
 

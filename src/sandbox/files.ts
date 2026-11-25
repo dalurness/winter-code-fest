@@ -1,3 +1,4 @@
+import { normalize } from "./paths";
 import { STATUS_ON_STORAGE, storageNameForSiteUrl, type Emulator } from "./vm";
 
 export interface Entry {
@@ -7,6 +8,17 @@ export interface Entry {
   /** Symlink target, as stored */
   target?: string;
 }
+
+/** An entry in the explorer, with the file a click opens */
+export interface TreeEntry extends Entry {
+  /** The regular file it is or links to, if any */
+  file?: string | undefined;
+}
+
+/** Build caches the quick open list skips */
+const SKIP = /^(node_modules|target|build|\.zig-cache|_build|\.git)$/;
+/** At most this many files in the quick open list */
+const MAX_LISTED = 20000;
 
 const S_IFMT = 0o170000;
 const S_IFDIR = 0o040000;
@@ -66,6 +78,45 @@ export class FileService {
           Number(b.kind === "dir") - Number(a.kind === "dir") ||
           a.name.localeCompare(b.name)
       );
+  }
+
+  /**
+   * The explorer's folders: each root, and the folders under it that are
+   * in `expanded` and inside an expanded folder, read all at once.
+   */
+  tree(roots: string[], expanded: string[]): Record<string, TreeEntry[]> {
+    const open = new Set(expanded);
+    const result: Record<string, TreeEntry[]> = {};
+    const walk = (dir: string) => {
+      result[dir] = this.list(dir).map((entry) => {
+        if (entry.kind === "dir") {
+          if (open.has(entry.path)) walk(entry.path);
+          return entry;
+        }
+        const file =
+          entry.kind === "file" ? entry.path : this.resolveFile(entry.path);
+        return { ...entry, file };
+      });
+    };
+    for (const root of roots) if (open.has(root)) walk(root);
+    return result;
+  }
+
+  /** Every file under the roots, skipping build caches, for quick open */
+  listAll(roots: string[]): string[] {
+    const result: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of this.list(dir)) {
+        if (result.length > MAX_LISTED) return;
+        if (entry.kind === "dir") {
+          if (!SKIP.test(entry.name)) walk(entry.path);
+        } else {
+          result.push(entry.path);
+        }
+      }
+    };
+    for (const root of roots) walk(root);
+    return result;
   }
 
   /** Follows symlinks to a regular file. Returns undefined for anything else. */
@@ -172,14 +223,4 @@ export class FileService {
     }
     return parent;
   }
-}
-
-/** Resolves `.` and `..` segments in an absolute path. */
-export function normalize(path: string): string {
-  const parts: string[] = [];
-  for (const part of path.split("/")) {
-    if (part === "..") parts.pop();
-    else if (part && part !== ".") parts.push(part);
-  }
-  return `/${parts.join("/")}`;
 }
