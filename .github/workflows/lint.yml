@@ -50,6 +50,9 @@ jobs:
           VALIDATE_MARKDOWN_PRETTIER: true
           VALIDATE_TYPESCRIPT_PRETTIER: true
           VALIDATE_YAML_PRETTIER: true
+          # Community solutions are kept as their authors wrote them; their
+          # code block languages are still checked below
+          FILTER_REGEX_EXCLUDE: src/content/communitySolutions/.*\.md$
 
   solution-languages:
     name: Check solution code block languages

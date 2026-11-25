@@ -1,0 +1,5 @@
+# Community solutions are kept as their authors wrote them
+src/content/communitySolutions/**/*.md
+
+# The sandbox image build's cache (also in sandbox/.gitignore, which Prettier doesn't read)
+sandbox/image/.cache/
