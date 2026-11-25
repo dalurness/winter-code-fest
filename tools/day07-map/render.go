@@ -168,7 +168,22 @@ type view struct {
 }
 
 // heights computes every pixel of the view, a row at a time across all CPUs.
-func (v view) heights() [][]int {
+func (v view) heights() [][]int { return v.heightsReusing(view{}, nil) }
+
+// heightsReusing is heights, but copies the pixels it shares with prev, a
+// view computed before whose heights are prevHs. After a pan at the same
+// zoom only the newly exposed edge is computed, which matters inside the
+// sandbox's emulated CPU, where a full frame takes most of a second.
+func (v view) heightsReusing(prev view, prevHs [][]int) [][]int {
+	di, dj, reuse := 0, 0, false
+	if prevHs != nil && prev.seed == v.seed && prev.zoom == v.zoom &&
+		(v.x0-prev.x0)%v.zoom == 0 && (v.y0-prev.y0)%v.zoom == 0 {
+		// Pixel (i, j) here is pixel (i+di, j+dj) in prev
+		dx, dy := (v.x0-prev.x0)/v.zoom, (v.y0-prev.y0)/v.zoom
+		if dx > -int64(prev.w) && dx < int64(prev.w) && dy > -int64(prev.h) && dy < int64(prev.h) {
+			di, dj, reuse = int(dx), int(dy), true
+		}
+	}
 	out := make([][]int, v.h)
 	rows := make(chan int)
 	var wg sync.WaitGroup
@@ -179,7 +194,15 @@ func (v view) heights() [][]int {
 			for j := range rows {
 				row := make([]int, v.w)
 				y := v.y0 + int64(j)*v.zoom
+				var old []int
+				if pj := j + dj; reuse && pj >= 0 && pj < prev.h {
+					old = prevHs[pj]
+				}
 				for i := range row {
+					if pi := i + di; old != nil && pi >= 0 && pi < prev.w {
+						row[i] = old[pi]
+						continue
+					}
 					row[i] = cellHeight(v.seed, v.x0+int64(i)*v.zoom, y, v.zoom)
 				}
 				out[j] = row

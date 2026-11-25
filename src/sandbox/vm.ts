@@ -84,6 +84,8 @@ export class InstructionCounter {
    * `sb`'s calibration runs; until then the idle rate stands in.
    */
   busyRate: number | undefined;
+  /** Called with the idle rate after each second's sample */
+  onIdleRate?: (rate: number) => void;
 
   constructor(private vm: Emulator) {
     setInterval(() => this.sampleIdle(), 1000);
@@ -118,6 +120,7 @@ export class InstructionCounter {
       if (this.idleRates.length > 30) this.idleRates.shift();
     }
     this.sample = { at, count };
+    this.onIdleRate?.(this.idleRate);
   }
 
   /** Call after restoring a snapshot, which moves v86's counter */
@@ -148,6 +151,27 @@ export function createVm(
     vm.add_listener("emulator-loaded", () => bundles.prefetch("base"));
   }
   return vm;
+}
+
+/**
+ * Restores a snapshot into a VM that has been running. v86 sets the guest's
+ * clock (the TSC) relative to the offset it already has, so a VM that had
+ * run for a while came back with its clock minutes behind the snapshot's,
+ * and the guest's shells hung waiting on time that had gone backward. Setting
+ * the clock to its own value first clears the offset, as in a new VM.
+ */
+export async function restoreSnapshot(vm: Emulator, snapshot: ArrayBuffer) {
+  const wasm = (
+    vm as unknown as { v86: { cpu: { wm: { exports: TscExports } } } }
+  ).v86.cpu.wm.exports;
+  const tsc = BigInt(wasm.read_tsc());
+  wasm.set_tsc(Number(tsc & 0xffffffffn), Number(tsc >> 32n));
+  await vm.restore_state(snapshot);
+}
+
+interface TscExports {
+  read_tsc(): bigint;
+  set_tsc(low: number, high: number): void;
 }
 
 /** The image's bundles, if it was built with them */

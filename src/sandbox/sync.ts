@@ -1,4 +1,5 @@
-import type { Emulator } from "./vm";
+import type { Fs9p } from "./vm";
+import type { VmClient } from "./vm-client";
 
 /** The serial port sb-agent listens on in the guest (ttyS2) */
 const AGENT_PORT = 2;
@@ -26,11 +27,8 @@ export interface GuestChanges {
  * While that is on its way the guest still has the old file, so its writes
  * to the file are not news for the editor.
  *
- * Guest to editor: the guest's writes all reach v86's 9p server, which runs
- * in this page, so wrapping its methods sees every change as it happens, with
- * nothing polling in the guest. Changes are collected by inode and handed on
- * in batches, so a build writing thousands of files costs a few Set adds per
- * write here.
+ * Guest to editor: the worker running the VM watches the guest's writes (see
+ * watchGuestWrites) and sends them here in batches.
  */
 export class GuestSync {
   /** Saves staged since the last request to sb-agent */
@@ -39,24 +37,26 @@ export class GuestSync {
   private applying = new Set<string>();
   private inFlight: ReturnType<typeof setTimeout> | undefined;
   private line = "";
-  private changes: GuestChanges = emptyChanges();
-  private timer: ReturnType<typeof setTimeout> | undefined;
   private resizeTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
   constructor(
-    private vm: Emulator,
-    private onChange: (changes: GuestChanges) => void
+    private vm: VmClient,
+    onChange: (changes: GuestChanges) => void
   ) {
-    vm.add_listener(`serial${AGENT_PORT}-output-byte`, (byte: number) => {
-      if (byte !== 10) {
-        this.line += String.fromCharCode(byte);
-        return;
+    vm.onSerial(AGENT_PORT, (items) => {
+      for (const item of items) {
+        if (item.kind !== "data") continue;
+        for (const byte of item.bytes) {
+          if (byte !== 10) {
+            this.line += String.fromCharCode(byte);
+            continue;
+          }
+          if (this.line.trim() === "applied") this.applied();
+          this.line = "";
+        }
       }
-      if (this.line.trim() === "applied") this.applied();
-      this.line = "";
     });
-    // fs9p exists from here, before a snapshot is restored into it
-    vm.add_listener("emulator-ready", () => this.watch());
+    vm.onChanges = onChange;
   }
 
   /** Called once a save is staged: has sb-agent apply it */
@@ -81,7 +81,7 @@ export class GuestSync {
       port,
       setTimeout(() => {
         this.resizeTimers.delete(port);
-        this.vm.serial_send_bytes(
+        this.vm.send(
           AGENT_PORT,
           new TextEncoder().encode(`size ${port} ${rows} ${cols}\n`)
         );
@@ -96,17 +96,14 @@ export class GuestSync {
   hangUp(port: 0 | 1) {
     clearTimeout(this.resizeTimers.get(port));
     this.resizeTimers.delete(port);
-    this.vm.serial_send_bytes(
-      AGENT_PORT,
-      new TextEncoder().encode(`close ${port}\n`)
-    );
+    this.vm.send(AGENT_PORT, new TextEncoder().encode(`close ${port}\n`));
   }
 
   private request() {
     this.applying = this.staged;
     this.staged = new Set();
     this.inFlight = setTimeout(() => this.applied(), AGENT_TIMEOUT_MS);
-    this.vm.serial_send_bytes(AGENT_PORT, new Uint8Array([10]));
+    this.vm.send(AGENT_PORT, new Uint8Array([10]));
   }
 
   private applied() {
@@ -116,47 +113,6 @@ export class GuestSync {
     // Saves that came in while it worked need another pass
     if (this.staged.size) this.request();
   }
-
-  private watch() {
-    const fs = this.vm.fs9p;
-    const note = <A extends unknown[], R>(
-      method: (...args: A) => R,
-      record: (...args: A) => void
-    ) =>
-      function (this: unknown, ...args: A): R {
-        record(...args);
-        return method.apply(this, args);
-      };
-    const changes = () => {
-      this.timer ??= setTimeout(() => this.flush(), CHANGE_DELAY_MS);
-      return this.changes;
-    };
-    const dir = (parentId: number) => changes().dirs.add(parentId);
-
-    fs.Write = note(fs.Write, (id) => changes().written.add(id));
-    fs.ChangeSize = note(fs.ChangeSize, (id) => changes().written.add(id));
-    fs.CreateFile = note(fs.CreateFile, (_, parentId) => dir(parentId));
-    fs.CreateDirectory = note(fs.CreateDirectory, (_, parentId) =>
-      dir(parentId)
-    );
-    fs.CreateNode = note(fs.CreateNode, (_, parentId) => dir(parentId));
-    fs.CreateSymlink = note(fs.CreateSymlink, (_, parentId) => dir(parentId));
-    fs.Link = note(fs.Link, (parentId) => dir(parentId));
-    fs.Unlink = note(fs.Unlink, (parentId) => dir(parentId));
-    fs.Rename = note(fs.Rename, (oldDir, _, newDir, newName) => {
-      const c = changes();
-      c.dirs.add(oldDir).add(newDir);
-      // Editors and `sed -i` save by renaming a new file over the old one
-      c.replaced.add(`${newDir}/${newName}`);
-    });
-  }
-
-  private flush() {
-    this.timer = undefined;
-    const changes = this.changes;
-    this.changes = emptyChanges();
-    this.onChange(changes);
-  }
 }
 
 const emptyChanges = (): GuestChanges => ({
@@ -164,3 +120,52 @@ const emptyChanges = (): GuestChanges => ({
   replaced: new Set(),
   dirs: new Set(),
 });
+
+/**
+ * Calls `onChange` with the guest's writes, at most every CHANGE_DELAY_MS.
+ * The guest's writes all reach v86's 9p server, which runs in JS beside the
+ * emulator, so wrapping its methods sees every change as it happens, with
+ * nothing polling in the guest. Changes are collected by inode and handed on
+ * in batches, so a build writing thousands of files costs a few Set adds per
+ * write.
+ */
+export function watchGuestWrites(
+  fs: Fs9p,
+  onChange: (changes: GuestChanges) => void
+) {
+  let pending = emptyChanges();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const note = <A extends unknown[], R>(
+    method: (...args: A) => R,
+    record: (...args: A) => void
+  ) =>
+    function (this: unknown, ...args: A): R {
+      record(...args);
+      return method.apply(this, args);
+    };
+  const changes = () => {
+    timer ??= setTimeout(() => {
+      timer = undefined;
+      const batch = pending;
+      pending = emptyChanges();
+      onChange(batch);
+    }, CHANGE_DELAY_MS);
+    return pending;
+  };
+  const dir = (parentId: number) => changes().dirs.add(parentId);
+
+  fs.Write = note(fs.Write, (id) => changes().written.add(id));
+  fs.ChangeSize = note(fs.ChangeSize, (id) => changes().written.add(id));
+  fs.CreateFile = note(fs.CreateFile, (_, parentId) => dir(parentId));
+  fs.CreateDirectory = note(fs.CreateDirectory, (_, parentId) => dir(parentId));
+  fs.CreateNode = note(fs.CreateNode, (_, parentId) => dir(parentId));
+  fs.CreateSymlink = note(fs.CreateSymlink, (_, parentId) => dir(parentId));
+  fs.Link = note(fs.Link, (parentId) => dir(parentId));
+  fs.Unlink = note(fs.Unlink, (parentId) => dir(parentId));
+  fs.Rename = note(fs.Rename, (oldDir, _, newDir, newName) => {
+    const c = changes();
+    c.dirs.add(oldDir).add(newDir);
+    // Editors and `sed -i` save by renaming a new file over the old one
+    c.replaced.add(`${newDir}/${newName}`);
+  });
+}
