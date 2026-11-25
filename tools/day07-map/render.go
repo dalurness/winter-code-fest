@@ -9,9 +9,9 @@ import (
 
 type rgb struct{ r, g, b uint8 }
 
-// palette[h+8] is the colour for height h. Air (<= 0) runs from deep teal
+// palette[h+8] is the color for height h. Air (<= 0) runs from deep teal
 // valleys to pale meadow; mountains (>= 1) run from brown foothills through
-// grey rock to snow.
+// gray rock to snow.
 var palette = [17]rgb{
 	{14, 42, 71}, {18, 56, 86}, {22, 72, 98}, {28, 90, 104}, {36, 108, 104},
 	{52, 126, 98}, {76, 146, 92}, {108, 166, 96}, {150, 188, 112},
@@ -20,8 +20,8 @@ var palette = [17]rgb{
 }
 
 // darkAir replaces the air half of the palette for the dark style: deep
-// valleys are near black and air at height 0 is a dark grey, so the
-// coloured mountains stand out.
+// valleys are near black and air at height 0 is a dark gray, so the
+// colored mountains stand out.
 var darkAir = [9]rgb{
 	{8, 8, 10}, {13, 13, 15}, {18, 18, 21}, {23, 23, 27}, {29, 29, 33},
 	{35, 35, 40}, {42, 42, 47}, {49, 49, 55}, {57, 57, 63},
@@ -37,9 +37,9 @@ func heightColor(h int) rgb { return palette[h-mapgen.MinHeight] }
 
 // Palettes for drawing tiles.
 const (
-	palColor = iota // full colour: teal and green air, brown to snow mountains
-	palDark         // dark grey air, coloured mountains
-	palGray         // dark grey air, light grey mountains, no middle greys
+	palColor = iota // full color: teal and green air, brown to snow mountains
+	palDark         // dark gray air, colored mountains
+	palGray         // dark gray air, light gray mountains, no middle grays
 	palMono         // black air, white mountains
 )
 
@@ -54,7 +54,7 @@ func parsePalette(s string) (int, bool) {
 	return 0, false
 }
 
-// tileColor is the colour of height h in palette pal.
+// tileColor is the color of height h in palette pal.
 func tileColor(h, pal int) rgb {
 	switch {
 	case pal == palMono && h <= 0:
@@ -75,8 +75,8 @@ func tileColor(h, pal int) rgb {
 	return heightColor(h)
 }
 
-// oxText is the colour of an O/X character for a tile coloured c, drawn on
-// the terminal's own background. Very dark colours are lifted so the
+// oxText is the color of an O/X character for a tile colored c, drawn on
+// the terminal's own background. Very dark colors are lifted so the
 // character stays visible on a dark terminal.
 func oxText(c rgb) rgb {
 	const floor = 64
@@ -117,7 +117,7 @@ func oxChar(h int) byte {
 	return 'X'
 }
 
-// cellHeight summarises the zoom x zoom block of tiles whose top-left corner
+// cellHeight summarizes the zoom x zoom block of tiles whose top-left corner
 // is (x0, y0). Blocks bigger than 4x4 are subsampled on a 4x4 grid. The block
 // counts as mountain when most samples are mountain, and its height is the
 // mean height of the winning kind, so a zoomed-out view keeps the same
@@ -244,7 +244,7 @@ func newOverlay(seed uint64) overlay {
 	return overlay{seed: seed, sx: sx, sy: sy, gx: gx, gy: gy}
 }
 
-// mark is an overlay pixel: its colour and its ASCII character.
+// mark is an overlay pixel: its color and its ASCII character.
 type mark struct {
 	c  rgb
 	ch byte
@@ -267,7 +267,7 @@ func (o overlay) marks(v view) map[[2]int]mark {
 
 // corridorMarks tints pixels that contain a corridor tile. At zoom 1 it
 // tests every tile. Zoomed out, sampled tiles could miss a corridor 3-5
-// tiles wide, so it walks each corridor's centre line instead.
+// tiles wide, so it walks each corridor's center line instead.
 func (o overlay) corridorMarks(v view, m map[[2]int]mark) {
 	if v.zoom == 1 {
 		for j := 0; j < v.h; j++ {
@@ -279,7 +279,7 @@ func (o overlay) corridorMarks(v view, m map[[2]int]mark) {
 		}
 		return
 	}
-	// Zoomed out: sample each corridor's centre line.
+	// Zoomed out: sample each corridor's center line.
 	mapgen.EachCorridorLine(o.seed, v.x0, v.y0, v.x0+int64(v.w)*v.zoom, v.y0+int64(v.h)*v.zoom, float64(v.zoom)/2,
 		func(x, y int64) {
 			if i, j, ok := v.pixel(x, y); ok {

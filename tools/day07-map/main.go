@@ -48,11 +48,11 @@ type common struct {
 
 func addCommon(fs *flag.FlagSet, c *common) {
 	fs.StringVar(&c.seedStr, "seed", "north-pole", "map seed: a number or any string")
-	fs.Int64Var(&c.x, "x", 0, "centre x (default: the start tile)")
-	fs.Int64Var(&c.y, "y", 0, "centre y (default: the start tile)")
+	fs.Int64Var(&c.x, "x", 0, "center x (default: the start tile)")
+	fs.Int64Var(&c.y, "y", 0, "center y (default: the start tile)")
 	fs.Int64Var(&c.zoom, "zoom", 1, "tiles per pixel (rounded down to a power of two)")
 	fs.BoolVar(&c.corr, "corridors", false, "highlight the corridor network")
-	fs.Func("palette", "colours: color, dark (grey air), gray (dark air, light mountains) or mono (black and white)", func(s string) error {
+	fs.Func("palette", "colors: color, dark (gray air), gray (dark air, light mountains) or mono (black and white)", func(s string) error {
 		p, ok := parsePalette(s)
 		if !ok {
 			return fmt.Errorf("want color, dark, gray or mono")
@@ -127,11 +127,11 @@ func runDump(args []string) {
 	defer out.Flush()
 	ov := c.overlay()
 	if *style == "color" {
-		v := centred(c, *w, *h*2)
+		v := centered(c, *w, *h*2)
 		out.WriteString(halfBlocks(v, v.heights(), ov.marks(v), false, c.pal))
 		return
 	}
-	v := centred(c, *w, *h)
+	v := centered(c, *w, *h)
 	hs := v.heights()
 	marks := ov.marks(v)
 	for j, row := range hs {
@@ -147,10 +147,10 @@ func runDump(args []string) {
 		}
 		out.WriteByte('\n')
 	}
-	fmt.Fprintf(out, "seed=%s (%d) centre=(%d,%d) zoom=1:%d\n", c.seedStr, c.seed, c.x, c.y, c.zoom)
+	fmt.Fprintf(out, "seed=%s (%d) center=(%d,%d) zoom=1:%d\n", c.seedStr, c.seed, c.x, c.y, c.zoom)
 }
 
-func centred(c common, w, h int) view {
+func centered(c common, w, h int) view {
 	return view{
 		seed: c.seed, zoom: c.zoom, w: w, h: h,
 		x0: c.x - int64(w/2)*c.zoom,
@@ -169,7 +169,7 @@ func runPNG(args []string) {
 	fs.Parse(args)
 	c.finish(fs)
 
-	v := centred(c, *w, *h)
+	v := centered(c, *w, *h)
 	hs := v.heights()
 	ov := c.overlay()
 	marks := ov.marks(v)
@@ -216,7 +216,7 @@ func runPNG(args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Printf("wrote %s: seed=%s centre=(%d,%d) zoom=1:%d\n", *o, c.seedStr, c.x, c.y, c.zoom)
+	fmt.Printf("wrote %s: seed=%s center=(%d,%d) zoom=1:%d\n", *o, c.seedStr, c.x, c.y, c.zoom)
 }
 
 func runGoal(args []string) {

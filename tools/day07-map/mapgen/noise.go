@@ -10,7 +10,7 @@ import "math"
 // at (0, 0) and at (2^62, -2^62).
 
 // point is a sample position: an integer tile plus a fractional offset.
-// After normalisation fx and fy are in [0, 1).
+// After normalization fx and fy are in [0, 1).
 type point struct {
 	x, y   int64
 	fx, fy float64
@@ -18,7 +18,7 @@ type point struct {
 
 func pt(x, y int64) point { return point{x: x, y: y} }
 
-// add offsets the point by a (small) float displacement and renormalises.
+// add offsets the point by a (small) float displacement and renormalizes.
 func (p point) add(dx, dy float64) point {
 	fx := p.fx + dx
 	fy := p.fy + dy

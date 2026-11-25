@@ -6,7 +6,7 @@ This folder is a standalone Go module. It is not part of the Astro site build. F
 
 ## The rules the generator guarantees
 
-- `mapgen.Height(seed, x, y)` is a pure function of a `uint64` seed and `int64` coordinates. It never looks at neighbouring tiles, so any tile anywhere in the 2^64 × 2^64 plane can be queried directly. The terrain is equally detailed at `(0, 0)` and at `(2^62, -2^62)`, because large coordinates are never converted to floating point.
+- `mapgen.Height(seed, x, y)` is a pure function of a `uint64` seed and `int64` coordinates. It never looks at neighboring tiles, so any tile anywhere in the 2^64 × 2^64 plane can be queried directly. The terrain is equally detailed at `(0, 0)` and at `(2^62, -2^62)`, because large coordinates are never converted to floating point.
 - Heights run from **-8 to 8**. A height of **0 or less is passable air**; **1 or more is mountain**. The height only matters for drawing nicer maps.
 - **Movement is 4-directional** (north, east, south, west). Two air tiles that touch only at a corner are _not_ connected. There is no diagonal movement and no squeezing between mountains.
 - North is `-y`, the top of the screen, as in the original day 7.
@@ -51,7 +51,7 @@ Commands:
 | `day07-map serve`          | Answers chunk requests on stdin/stdout so any language can read the map; see below                                 |
 | `go test ./...`            | Determinism, golden checksum, far coordinates, terrain and corridor connectivity, the goal and the server protocol |
 
-Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the centre tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-palette color|dark|gray|mono` to pick the colours: `color` is the full palette, `dark` draws air in dark greys under coloured mountains, `gray` uses dark greys for air and light greys for mountains with no middle greys, and `mono` is pure black air and white mountains. The viewer starts with that palette, and `png` and `dump -style color` use it too.
+Every map command takes `-seed` (a number or any string; strings are hashed), `-x` and `-y` (the center tile; defaults to the start), and `-zoom` (tiles per pixel, a power of two). They also take `-corridors` to highlight the corridor network, and `-palette color|dark|gray|mono` to pick the colors: `color` is the full palette, `dark` draws air in dark grays under colored mountains, `gray` uses dark grays for air and light grays for mountains with no middle grays, and `mono` is pure black air and white mountains. The viewer starts with that palette, and `png` and `dump -style color` use it too.
 
 ### Viewer keys
 
@@ -61,19 +61,19 @@ Every map command takes `-seed` (a number or any string; strings are hashed), `-
 | Shift+arrows, `W` `A` `S` `D`, `H` `J` `K` `L` | Pan half a screen                                                                                   |
 | `f`                                            | Toggle fast pan, so the normal pan keys move half a screen                                          |
 | `+` / `z`, `-` / `x`                           | Zoom in or out (1 to 2^20 tiles per pixel)                                                          |
-| `m`                                            | Switch between colour half blocks and O/X characters                                                |
-| `p`                                            | Cycle the palette: color, dark (grey air), gray (dark air, light mountains), mono (black and white) |
+| `m`                                            | Switch between color half blocks and O/X characters                                                 |
+| `p`                                            | Cycle the palette: color, dark (gray air), gray (dark air, light mountains), mono (black and white) |
 | `o` / `0`                                      | Jump to the start                                                                                   |
 | `g`                                            | Jump to the goal                                                                                    |
 | `c`                                            | Highlight the corridor network                                                                      |
 | `?`                                            | Show or hide the help lines                                                                         |
 | `q`                                            | Quit                                                                                                |
 
-The status line shows the seed, the centre tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit colour, so use a truecolor terminal. Use `m` to switch to O/X characters, drawn in the palette's colours on the terminal's own background. The start is red, the goal is magenta and highlighted corridors are cyan.
+The status line shows the seed, the center tile with its height, the zoom, the mode, the goal and the frame time. The default mode draws two square pixels per character cell with `▀` and 24-bit color, so use a truecolor terminal. Use `m` to switch to O/X characters, drawn in the palette's colors on the terminal's own background. The start is red, the goal is magenta and highlighted corridors are cyan.
 
-The viewer at zoom 1:4 on the start, in colour blocks:
+The viewer at zoom 1:4 on the start, in color blocks:
 
-![The viewer in colour blocks](docs/viewer-blocks.png)
+![The viewer in color blocks](docs/viewer-blocks.png)
 
 Zoom 1:32 with the dark palette, corridors highlighted (`c`) and the help lines shown (`?`):
 
@@ -131,7 +131,7 @@ For a single rectangle, `day07-map chunk -x X -y Y -w W -h H -format ox` prints 
 
 ## Gallery (seed `north-pole`)
 
-Zoom 1:128, centred on the start. Massifs (brown) cover about half the map. Open lowlands (green and blue) are scattered with small mountains.
+Zoom 1:128, centered on the start. Massifs (brown) cover about half the map. Open lowlands (green and blue) are scattered with small mountains.
 
 ![Overview at zoom 1:128](docs/overview-z128.png)
 
@@ -179,7 +179,7 @@ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOO
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOXXXXXXXXXXXXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOOOOXXXXXXXXXXXXXXXXO
 ```
 
-The start (red, centre) and the goal (magenta, right) at zoom 1:2048. At this zoom the terrain is just noise:
+The start (red, center) and the goal (magenta, right) at zoom 1:2048. At this zoom the terrain is just noise:
 
 ![Start and goal at zoom 1:2048](docs/start-goal-z2048.png)
 

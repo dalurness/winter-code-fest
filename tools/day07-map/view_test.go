@@ -38,7 +38,7 @@ type cell struct {
 
 var sgrRe = regexp.MustCompile(`^\x1b\[([0-9;]*)m`)
 
-// screen decodes a frame's SGR colours and characters into cells, row by
+// screen decodes a frame's SGR colors and characters into cells, row by
 // row, as a terminal would.
 func screen(frame string) [][]cell {
 	var rows [][]cell
@@ -77,7 +77,7 @@ func screen(frame string) [][]cell {
 	return append(rows, row)
 }
 
-// The formats the viewer used before sending colours only on change
+// The formats the viewer used before sending colors only on change
 func oldHalfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) string {
 	var b strings.Builder
 	col := func(i, j int) rgb {

@@ -2,7 +2,7 @@
 // unbounded grid of tiles computed on demand from a single seed.
 //
 // Every function here is pure. Height(seed, x, y) depends only on its
-// arguments, never on neighbouring tiles or on anything computed earlier, so
+// arguments, never on neighboring tiles or on anything computed earlier, so
 // any tile anywhere in the int64 plane can be queried directly.
 //
 // Every seed is solvable: the start and the goal are both nodes of a
@@ -174,7 +174,7 @@ func stamps(seed uint64, p point, h float64) float64 {
 				h = math.Max(h, 0.3+0.5*smoothstep(br, 0, d))
 			}
 		}
-	case kind < 0.52: // basin: a deep, open bowl (only affects colour)
+	case kind < 0.52: // basin: a deep, open bowl (only affects color)
 		R := 30 + 120*next()
 		ox, oy := R+(size-2*R)*next(), R+(size-2*R)*next()
 		d := math.Hypot(lx-ox, ly-oy)

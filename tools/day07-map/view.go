@@ -15,8 +15,8 @@ import (
 	"wcf/day07-map/mapgen"
 )
 
-// sgr writes colour escapes for a run of cells, sending each colour only
-// when it differs from the cell before. Repeating the same truecolour codes
+// sgr writes color escapes for a run of cells, sending each color only
+// when it differs from the cell before. Repeating the same truecolor codes
 // for every cell made frames about three times bigger, which costs the VM
 // time to format and the terminal time to parse.
 type sgr struct {
@@ -46,7 +46,7 @@ func (s *sgr) set(fg rgb, bg *rgb) {
 	s.b = append(s.b, 'm')
 }
 
-// endLine resets the colours, so the rest of the line keeps the terminal's
+// endLine resets the colors, so the rest of the line keeps the terminal's
 // background, and moves to the next line.
 func (s *sgr) endLine() {
 	s.b = append(s.b, "\x1b[0m\r\n"...)
@@ -63,7 +63,7 @@ func appendColor(b []byte, c rgb) []byte {
 
 // halfBlocks renders a view whose height is two pixels per text row using
 // "▀" with a truecolor foreground (top pixel) and background (bottom pixel),
-// in palette pal. With cross set, the centre pixel is drawn as a crosshair.
+// in palette pal. With cross set, the center pixel is drawn as a crosshair.
 func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) string {
 	s := sgr{b: make([]byte, 0, v.w*v.h*4)}
 	col := func(i, j int) rgb {
@@ -77,7 +77,7 @@ func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) 
 		for i := 0; i < v.w; i++ {
 			t, u := col(i, j), col(i, j+1)
 			if cross && i == cx && (j == cy || j+1 == cy) {
-				// Keep the other pixel's colour as the background.
+				// Keep the other pixel's color as the background.
 				bg := u
 				if j+1 == cy {
 					bg = t
@@ -95,7 +95,7 @@ func halfBlocks(v view, hs [][]int, marks map[[2]int]mark, cross bool, pal int) 
 }
 
 // oxFrame renders one O (air) or X (mountain) per pixel on the terminal's
-// own background, each character coloured by palette pal.
+// own background, each character colored by palette pal.
 func oxFrame(v view, hs [][]int, marks map[[2]int]mark, pal int) string {
 	s := sgr{b: make([]byte, 0, v.w*v.h*2)}
 	for j, row := range hs {
@@ -118,7 +118,7 @@ func oxFrame(v view, hs [][]int, marks map[[2]int]mark, pal int) string {
 type viewer struct {
 	seedStr string
 	seed    uint64
-	x, y    int64 // centre tile
+	x, y    int64 // center tile
 	zoom    int64
 	fast    bool
 	ox      bool // O/X characters instead of half blocks
