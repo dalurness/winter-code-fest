@@ -130,26 +130,27 @@ export class VmClient {
   }
 }
 
+/** The FileService methods the page calls */
+type FileCalls = Pick<
+  Calls,
+  | "exists"
+  | "isDir"
+  | "list"
+  | "tree"
+  | "listAll"
+  | "resolveFile"
+  | "size"
+  | "locate"
+  | "readBytes"
+  | "write"
+  | "mkdir"
+>;
+
 /**
  * FileService (files.ts) from the page, through the worker. Calls run in the
  * order they are made.
  */
-export class FilesClient implements Async<
-  Pick<
-    Calls,
-    | "exists"
-    | "isDir"
-    | "list"
-    | "tree"
-    | "listAll"
-    | "resolveFile"
-    | "size"
-    | "locate"
-    | "readBytes"
-    | "write"
-    | "mkdir"
-  >
-> {
+export class FilesClient implements Async<FileCalls> {
   /** Called after each write is staged */
   onStaged?: (path: string) => void;
 

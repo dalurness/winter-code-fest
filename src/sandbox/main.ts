@@ -1178,8 +1178,8 @@ ui.previewToggle.onclick = () => togglePreview();
 
 // --- Tab context menu ----------------------------------------------------
 
-type MenuItem =
-  [label: string, action: () => void, current?: boolean] | "separator";
+type MenuAction = [label: string, action: () => void, current?: boolean];
+type MenuItem = MenuAction | "separator";
 
 function showMenu(
   items: MenuItem[],
