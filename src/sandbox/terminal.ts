@@ -141,6 +141,13 @@ interface GhosttyInternals {
     hoveredHyperlinkId: number;
     hoveredLinkRange: unknown;
     selectionManager?: { getDirtySelectionRows(): Set<number> };
+    fontSize: number;
+    fontFamily: string;
+    ctx: CanvasRenderingContext2D;
+    devicePixelRatio: number;
+    metrics: { width: number; height: number; baseline: number };
+    measureFont(): { width: number; height: number; baseline: number };
+    remeasureFont(): void;
   };
   viewportY: number;
   scrollbarOpacity: number;
@@ -149,6 +156,79 @@ interface GhosttyInternals {
   isOpen: boolean;
   isDisposed: boolean;
   startRenderLoop(): void;
+}
+
+/**
+ * ghostty-web makes each row as tall as the letter M, with the baseline just
+ * below M's top. Taller glyphs (accented capitals, box drawing) and
+ * descenders then reach past their row: on the first row the canvas cut
+ * their tops off, and redrawing a row erased the parts of its neighbors'
+ * glyphs that reached into it. Rows measured from the tallest glyphs hold
+ * them all. It applies to font size changes too.
+ */
+function fitRowsToGlyphs(renderer: GhosttyInternals["renderer"]) {
+  const measure = renderer.measureFont.bind(renderer);
+  renderer.measureFont = () => {
+    const metrics = measure();
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    ctx.font = `${renderer.fontSize}px ${renderer.fontFamily}`;
+    const glyphs = ctx.measureText("ÉÅ|│gjpqy");
+    const baseline = Math.ceil(glyphs.actualBoundingBoxAscent);
+    const height = baseline + Math.ceil(glyphs.actualBoundingBoxDescent);
+    return {
+      width: metrics.width,
+      height: Math.max(height, metrics.height),
+      baseline,
+    };
+  };
+  renderer.remeasureFont();
+}
+
+/** Block elements' rectangles: [left, top, width, height] in eighths of a cell */
+const BLOCKS: Record<string, [number, number, number, number]> = {
+  "▀": [0, 0, 8, 4],
+  "▔": [0, 0, 8, 1],
+  "▐": [4, 0, 4, 8],
+  "▕": [7, 0, 1, 8],
+};
+for (let n = 1; n <= 8; n++) {
+  // ▁ to █ grow up from the bottom, ▏ to █ right from the left
+  BLOCKS[String.fromCodePoint(0x2580 + n)] = [0, 8 - n, 8, n];
+  BLOCKS[String.fromCodePoint(0x2590 - n)] ??= [0, 0, n, 8];
+}
+
+/**
+ * Puts every rectangle the renderer fills (cell backgrounds, the cursor) on
+ * whole device pixels, so neighbors share their edges rather than each half
+ * covering the pixel between: at 125% or 150% that left faint lines between
+ * rows and columns. Block elements (█ ▀ ▄ ▌ ▐ and the eighths) become such
+ * rectangles too, filling their cell like Ghostty's and xterm.js's own,
+ * rather than the font's glyphs, which never quite match the row height:
+ * the chillenge 7 map viewer's half blocks meet with no gap or overlap.
+ */
+function drawCellsOnPixels(renderer: GhosttyInternals["renderer"]) {
+  const { ctx } = renderer;
+  const fillRect = ctx.fillRect.bind(ctx);
+  const snap = (at: number) =>
+    Math.round(at * renderer.devicePixelRatio) / renderer.devicePixelRatio;
+  ctx.fillRect = (x, y, w, h) => {
+    const x0 = snap(x);
+    const y0 = snap(y);
+    fillRect(x0, y0, snap(x + w) - x0, snap(y + h) - y0);
+  };
+  const fillText = ctx.fillText.bind(ctx);
+  ctx.fillText = (text, x, y, maxWidth) => {
+    const block = BLOCKS[text];
+    if (!block) return fillText(text, x, y, maxWidth);
+    const { width, height, baseline } = renderer.metrics;
+    const [left, top, w, h] = block;
+    ctx.fillRect(
+      x + (left * width) / 8,
+      y - baseline + (top * height) / 8,
+      (w * width) / 8,
+      (h * height) / 8
+    );
+  };
 }
 
 /** One measured run: v86's instruction count and the real time it took */
@@ -204,6 +284,8 @@ export class SerialTerminal {
     this.renderWhenNeeded();
     this.term.open(element);
     const renderer = (this.term as unknown as GhosttyInternals).renderer;
+    fitRowsToGlyphs(renderer);
+    drawCellsOnPixels(renderer);
     const css = renderer.rgbToCSS.bind(renderer);
     renderer.rgbToCSS = (r, g, b) =>
       this.colors.get((r << 16) | (g << 8) | b) ?? css(r, g, b);
